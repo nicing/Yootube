@@ -1,0 +1,5 @@
+.build/
+.swiftpm/
+dist/
+.firecrawl/
+.DS_Store
