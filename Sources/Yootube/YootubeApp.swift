@@ -151,6 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var terminationSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        _ = AppUpdater.shared
         UNUserNotificationCenter.current().delegate = self
         terminationSources = [SIGTERM, SIGINT].map { signalNumber in
             signal(signalNumber, SIG_IGN)

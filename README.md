@@ -86,6 +86,25 @@ chmod +x scripts/build-dmg.sh
 
 The installer is written to `dist/Yootube.dmg`. The first build downloads and compiles pinned upstream runtime components, so it takes several minutes. Later builds reuse the verified cache. The app is ad-hoc signed for local use, so macOS may ask you to confirm opening it the first time.
 
+## Updates
+
+Settings → Version shows the installed version, a manual check, and an automatic-check switch that is on by default. Sparkle checks `appcast.xml` from this repository in the background; when a newer signed release exists, it asks before installing. Turning off the switch stops background checks but leaves manual checks available. The feed currently contains no release, so there is no update to install yet.
+
+For each public release, increment both `YOOTUBE_VERSION` and the numeric `YOOTUBE_BUILD_NUMBER`. Sign the app with a **Developer ID Application** identity, notarize the DMG, and upload it as `Yootube.dmg` to the matching `vVERSION` GitHub Release. Then run `scripts/generate-appcast.sh` and commit/push the resulting `appcast.xml`. The generator signs the DMG entry with the Sparkle EdDSA key in this Mac's Keychain; the private key must never be committed. The public key is embedded in the app. Example build:
+
+```bash
+YOOTUBE_VERSION=1.21.2 YOOTUBE_BUILD_NUMBER=124 \
+  YOOTUBE_CODESIGN_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' \
+  ./scripts/build-dmg.sh
+xcrun notarytool submit dist/Yootube.dmg --keychain-profile YOUR_PROFILE --wait
+xcrun stapler staple dist/Yootube.dmg
+gh release create v1.21.2 dist/Yootube.dmg --title 'Yootube 1.21.2' --notes 'Release notes'
+./scripts/generate-appcast.sh
+git add appcast.xml && git commit -m 'Publish Yootube 1.21.2 update feed' && git push
+```
+
+This Mac currently has Apple Development certificates but no Developer ID Application certificate. The ad-hoc DMG above is suitable for local testing; publish the update only after Developer ID signing and notarization. Once a signed Release has been uploaded, `scripts/generate-appcast.sh` prepares the feed entry for that same DMG. Never rebuild the DMG after generating its signature.
+
 This build currently targets Apple Silicon and requires macOS 14 or later. Internet access is still required to retrieve YouTube metadata and video streams, but all Invidious application traffic goes through the service running inside Yootube on this Mac.
 
 Invidious is licensed under AGPL-3.0-only. PostgreSQL, OpenSSL, Crystal, and Invidious Companion retain their respective upstream licenses; see `THIRD_PARTY_NOTICES.md` and the licenses bundled inside the app.

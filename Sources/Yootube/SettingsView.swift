@@ -5,6 +5,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
     case data
     case service
+    case version
 
     var id: String { rawValue }
     var title: String {
@@ -12,6 +13,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         case .general: L10n.t("通用")
         case .data: L10n.t("数据与缓存")
         case .service: L10n.t("本地服务")
+        case .version: L10n.t("版本")
         }
     }
     var icon: String {
@@ -19,6 +21,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         case .general: "gear-six"
         case .data: "hard-drive"
         case .service: "desktop"
+        case .version: "arrow-clockwise"
         }
     }
 }
@@ -29,6 +32,7 @@ struct SettingsView: View {
     @StateObject private var subscriptions = ChannelSubscriptionStore()
     @StateObject private var history = WatchHistory()
     @StateObject private var videoCache = VideoCacheStore.shared
+    @ObservedObject private var updater = AppUpdater.shared
     @AppStorage("appAppearance") private var appearance = AppAppearance.system
     @AppStorage(AppLanguage.defaultsKey) private var language = AppLanguage.zhHans
     @State private var category = SettingsCategory.general
@@ -115,6 +119,7 @@ struct SettingsView: View {
                 case .general: generalSettings
                 case .data: dataSettings
                 case .service: serviceSettings
+                case .version: versionSettings
                 }
             }
             .padding(.horizontal, 32)
@@ -229,6 +234,31 @@ struct SettingsView: View {
                 Button(L10n.t("重启本地服务")) { service.restart() }
                     .buttonStyle(SettingsPrimaryButtonStyle())
                 Button(L10n.t("打开日志目录")) { service.revealLogsDirectory() }
+            }
+        }
+    }
+
+    private var versionSettings: some View {
+        VStack(spacing: 0) {
+            SettingsRow(title: L10n.t("当前版本")) {
+                Text("Yootube \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")")
+                    .font(.system(size: 13))
+                    .foregroundStyle(KumoTheme.subtle)
+            }
+            SettingsRow(title: L10n.t("自动更新"),
+                        detail: L10n.t("自动检查新版本；安装前会先询问你。")) {
+                Toggle(L10n.t("自动更新"), isOn: Binding(
+                    get: { updater.automaticallyChecksForUpdates },
+                    set: { updater.setAutomaticallyChecksForUpdates($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+            SettingsRow(title: L10n.t("检查更新"),
+                        detail: L10n.t("检查 GitHub 上发布的最新版本。")) {
+                Button(L10n.t("检查更新")) { updater.checkForUpdates() }
+                    .disabled(!updater.canCheckForUpdates)
             }
         }
     }

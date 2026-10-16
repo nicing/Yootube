@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Yootube Updates</title>
+    <link>https://github.com/nicing/Yootube/releases</link>
+    <description>Yootube for macOS</description>
+  </channel>
+</rss>

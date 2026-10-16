@@ -8,8 +8,10 @@ Yootube bundles unmodified runtime components from these projects:
 - PostgreSQL macOS binaries from `theseus-rs/postgresql-binaries`: https://github.com/theseus-rs/postgresql-binaries
 - OpenSSL 3.6.3, Apache License 2.0: https://www.openssl.org/
 - Crystal 1.21.0 is used only while building Invidious: https://crystal-lang.org/
+- Sparkle 2.10.0 powers app updates, MIT License: https://github.com/sparkle-project/Sparkle
 
 The corresponding license texts are copied into `Yootube.app/Contents/Resources/Runtime/licenses` during packaging. The complete source for the bundled Invidious revision is available from its repository at the commit above.
+Sparkle's license is copied to `Yootube.app/Contents/Resources/Sparkle-LICENSE.txt`.
 # Interface design and icons
 
 The native interface adapts semantic colors and component dimensions from

@@ -6,6 +6,12 @@ build_dir="$project_dir/.build/distribution"
 app_dir="$build_dir/Yootube.app"
 dmg_root="$build_dir/dmg"
 output_dir="$project_dir/dist"
+version="${YOOTUBE_VERSION:-1.21.1}"
+build_number="${YOOTUBE_BUILD_NUMBER:-123}"
+signing_identity="${YOOTUBE_CODESIGN_IDENTITY:--}"
+
+[[ "$version" =~ ^[0-9]+(\.[0-9]+)+$ ]] || { echo "Invalid YOOTUBE_VERSION" >&2; exit 1; }
+[[ "$build_number" =~ ^[0-9]+$ ]] || { echo "Invalid YOOTUBE_BUILD_NUMBER" >&2; exit 1; }
 
 cd "$project_dir"
 swift build -c release
@@ -14,6 +20,10 @@ rm -rf "$build_dir" "$output_dir/Yootube.dmg"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources" "$dmg_root" "$output_dir"
 cp "$project_dir/.build/release/Yootube" "$app_dir/Contents/MacOS/Yootube"
 cp -R "$project_dir/.build/release/Yootube_Yootube.bundle" "$app_dir/Contents/Resources/"
+mkdir -p "$app_dir/Contents/Frameworks"
+cp -R "$project_dir/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" \
+    "$app_dir/Contents/Frameworks/"
+cp "$project_dir/.build/artifacts/sparkle/Sparkle/LICENSE" "$app_dir/Contents/Resources/Sparkle-LICENSE.txt"
 swift "$project_dir/scripts/create-icon.swift" "$build_dir/AppIcon.iconset"
 iconutil -c icns "$build_dir/AppIcon.iconset" -o "$app_dir/Contents/Resources/AppIcon.icns"
 "$project_dir/scripts/prepare-runtime.sh" "$app_dir/Contents/Resources/Runtime"
@@ -41,6 +51,14 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
     <string>1.21.1</string>
     <key>CFBundleVersion</key>
     <string>123</string>
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/nicing/Yootube/main/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>JdGZLxEqYLpA83Z8L/iBoeQ/2OcApHUgVbpzexh8Fs8=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
@@ -77,7 +95,13 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-codesign --force --deep --sign - "$app_dir"
+plutil -replace CFBundleShortVersionString -string "$version" "$app_dir/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$build_number" "$app_dir/Contents/Info.plist"
+if [[ "$signing_identity" == "-" ]]; then
+    codesign --force --deep --sign - "$app_dir"
+else
+    codesign --force --deep --options runtime --timestamp --sign "$signing_identity" "$app_dir"
+fi
 cp -R "$app_dir" "$dmg_root/Yootube.app"
 ln -s /Applications "$dmg_root/Applications"
 
