@@ -18,8 +18,8 @@ open the local playlist page. Select a video there to use the existing player.
 
 Viewing history is saved locally after playback begins (up to 30 unique videos).
 It starts with this version and does not import Google/YouTube account history.
-Return home with the toolbar home button or Cmd-Shift-H; Cmd-L returns home and
-focuses search. The toolbar and trackpad navigation follow one shared history
+Return home with the toolbar home button or H; Command-K or Command-F focuses
+search. The toolbar and trackpad navigation follow one shared history
 across home, collections, search, channel, playlist, and video pages.
 The app icon and home mark use the red-and-white YouTube play symbol.
 
@@ -28,9 +28,8 @@ toolbar, a local-library sidebar, and one rounded main content surface. Phosphor
 SVG icons are bundled locally. Appearance offers Light, Dark and System (the
 default), available in Settings. The dark appearance uses
 near-black and charcoal surfaces while primary actions remain YouTube red. The
-selected appearance and sidebar state persist across launches. Collapse/expand
-the sidebar with its top button or Control-Command-S. Collapsed mode shows each
-collection's initials and reveals its full name on hover. The title bar retains
+selected appearance and sidebar state persist across launches. Hide/show the
+sidebar with its top button, Command-B, or [. The title bar retains
 its native macOS appearance and real system window controls.
 Local search/channel pages follow the selected appearance without reloading;
 the player retains its existing dark controls in both modes.
@@ -47,8 +46,8 @@ picture-in-picture, and the stream's available quality/caption/audio options.
 The expand button fills the right content area without changing the macOS window;
 Escape closes the menu first, then restores the player. The Back
 button returns to the originating home or web page; switching videos or returning
-home stops the old player. Search, channel and subscription pages still use the
-local Invidious interface.
+home stops the old player. Search, channel, and playlist pages use native views
+backed by the local Invidious service.
 
 Favorites are independent of accounts and viewing history. The left sidebar
 starts with two lists: Watch Later and Favorite. Select a name in the flat sidebar
@@ -62,7 +61,7 @@ to remove the video from it, or use the remove button in that folder's list.
 Folder names and IDs, video titles, channel names, video IDs and save dates are stored only in
 `~/Library/Application Support/Yootube/favorites.json`, using atomic writes.
 Favorites persist across app restarts and have no 30-video history limit. The
-list remains readable without network access; playing videos requires Internet.
+list remains readable without network access; fully cached videos can play offline.
 On a local Playlist or Mix page, use 保存到本地收藏夹 to import the whole list
 as one local folder. Re-importing the same source merges new videos without
 duplicates and keeps the local folder name and any extra videos already in it.

@@ -18,12 +18,14 @@ struct KeyboardShortcutsSheet: View {
 
     static var sections: [KeyboardShortcutSection] { [
         KeyboardShortcutSection(title: L10n.t("导航"), items: [
-            KeyboardShortcutItem(title: L10n.t("显示快捷键"), keys: ["?"]),
-            KeyboardShortcutItem(title: L10n.t("打开或关闭左侧栏"), keys: ["/"]),
+            KeyboardShortcutItem(title: L10n.t("显示快捷键"), keys: ["/", "?"]),
+            KeyboardShortcutItem(title: L10n.t("打开或关闭左侧栏"), keys: ["⌘ B", "["]),
             KeyboardShortcutItem(title: L10n.t("搜索"), keys: ["⌘ K", "⌘ F"]),
             KeyboardShortcutItem(title: L10n.t("回到首页"), keys: ["H"]),
             KeyboardShortcutItem(title: L10n.t("后退"), keys: ["←"]),
             KeyboardShortcutItem(title: L10n.t("前进"), keys: ["→"]),
+            KeyboardShortcutItem(title: L10n.t("刷新"), keys: ["R"]),
+            KeyboardShortcutItem(title: L10n.t("打开或关闭频道更新"), keys: ["U"]),
             KeyboardShortcutItem(title: L10n.t("设置"), keys: ["⌘ ,"])
         ]),
         KeyboardShortcutSection(title: L10n.t("收藏夹"), items: [
@@ -125,12 +127,12 @@ struct KeyboardShortcutsSheet: View {
 enum KeyboardShortcutsShortcut {
     static func matches(_ event: NSEvent, firstResponder: NSResponder?) -> Bool {
         let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
-        let isQuestionMark = event.characters == "?" ||
-            (modifiers == .shift && event.charactersIgnoringModifiers == "/")
+        let isShortcut = (modifiers.isEmpty && (event.characters == "/" || event.characters == "?")) ||
+            (modifiers == .shift &&
+             (event.characters == "?" || event.charactersIgnoringModifiers == "/"))
         guard event.type == .keyDown,
               !event.isARepeat,
-              modifiers == .shift || modifiers.isEmpty,
-              isQuestionMark,
+              isShortcut,
               !(firstResponder is NSTextView || firstResponder is NSTextField) else { return false }
         return true
     }

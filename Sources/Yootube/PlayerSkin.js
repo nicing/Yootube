@@ -5,6 +5,7 @@
 const englishStrings = {
     '本地缓存':'Local cache', '播放':'Play', '视频进度':'Video progress', '静音':'Mute',
     '开启字幕':'Turn on captions', '影院模式':'Theater mode', '更多':'More', '播放设置':'Playback settings',
+    '音量':'Volume', '字幕/CC':'Subtitles/CC', '关闭':'Off',
     '直播':'Live', '暂停':'Pause', '取消静音':'Unmute', '关闭字幕':'Turn off captions',
     '当前视频没有字幕':'No captions are available', '退出影院模式 · Esc':'Exit theater mode · Esc',
     '暂时无法播放，请再次点击播放或重试加载。':'Playback is temporarily unavailable. Click play again or retry.',
@@ -15,7 +16,39 @@ const englishStrings = {
     '当前播放环境不支持画中画':'Picture in Picture is unavailable in this playback environment',
     '清晰度':'Quality'
 };
-const tr = source => window.yootubeLanguage === 'en' ? (englishStrings[source] || source) : source;
+const traditionalStrings = {
+    '本地缓存':'本機快取', '播放':'播放', '视频进度':'影片進度', '静音':'靜音',
+    '开启字幕':'開啟字幕', '影院模式':'劇院模式', '更多':'更多', '播放设置':'播放設定',
+    '音量':'音量', '字幕/CC':'字幕/CC', '关闭':'關閉',
+    '直播':'直播', '暂停':'暫停', '取消静音':'取消靜音', '关闭字幕':'關閉字幕',
+    '当前视频没有字幕':'目前影片沒有字幕', '退出影院模式 · Esc':'退出劇院模式 · Esc',
+    '暂时无法播放，请再次点击播放或重试加载。':'暫時無法播放，請再次點擊播放或重新載入。',
+    '‹ 返回':'‹ 返回', '自动':'自動', '字幕':'字幕', '音轨':'音軌', '播放速度':'播放速度',
+    '退出画中画':'退出子母畫面', '画中画':'子母畫面',
+    '正在准备画中画…':'正在準備子母畫面…',
+    '当前视频暂时无法进入画中画。':'目前影片暫時無法進入子母畫面。',
+    '当前播放环境不支持画中画':'目前播放環境不支援子母畫面', '清晰度':'畫質'
+};
+const japaneseStrings = {
+    '本地缓存':'ローカルキャッシュ', '播放':'再生', '视频进度':'動画の再生位置', '静音':'ミュート',
+    '开启字幕':'字幕をオン', '影院模式':'シアターモード', '更多':'その他', '播放设置':'再生設定',
+    '音量':'音量', '字幕/CC':'字幕/CC', '关闭':'オフ',
+    '直播':'ライブ', '暂停':'一時停止', '取消静音':'ミュート解除', '关闭字幕':'字幕をオフ',
+    '当前视频没有字幕':'この動画に字幕はありません', '退出影院模式 · Esc':'シアターモードを終了 · Esc',
+    '暂时无法播放，请再次点击播放或重试加载。':'再生できません。もう一度再生するか、読み込み直してください。',
+    '‹ 返回':'‹ 戻る', '自动':'自動', '字幕':'字幕', '音轨':'音声トラック', '播放速度':'再生速度',
+    '退出画中画':'ピクチャ・イン・ピクチャを終了', '画中画':'ピクチャ・イン・ピクチャ',
+    '正在准备画中画…':'ピクチャ・イン・ピクチャを準備しています…',
+    '当前视频暂时无法进入画中画。':'この動画は現在ピクチャ・イン・ピクチャにできません。',
+    '当前播放环境不支持画中画':'現在の再生環境ではピクチャ・イン・ピクチャを使用できません',
+    '清晰度':'画質'
+};
+const tr = source => {
+    const strings = window.yootubeLanguage === 'en' ? englishStrings
+        : window.yootubeLanguage === 'zh-Hant' ? traditionalStrings
+        : window.yootubeLanguage === 'ja' ? japaneseStrings : null;
+    return strings?.[source] || source;
+};
 let activateMenuButton = null;
 let menuPointerID = null;
 let suppressMenuPointerClick = false;
@@ -189,28 +222,126 @@ const referenceCSS = `
     height: 16px;
 }
 
-#player .video-player__toolbar-state--volume {
-    width: 14.333px;
-    height: 12.057px;
+#player .video-player__toolbar-anchor {
+    position: relative;
+    width: 32px;
+    height: 32px;
 }
 
-#player .video-player__toolbar-state--cc {
-    width: 18px;
-    height: 14px;
-    color: #fff;
-    font: 700 10px/14px -apple-system, BlinkMacSystemFont, sans-serif;
-    letter-spacing: -0.03em;
+#player .video-player__toolbar-anchor--volume::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 8px;
 }
 
+#player .video-player__volume-popup {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 8px);
+    width: 32px;
+    height: 80px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(50px);
+    -webkit-backdrop-filter: blur(50px);
+    overflow: hidden;
+    pointer-events: auto;
+}
+
+#player .video-player__volume-popup[hidden],
+#player .video-player__captions-popup[hidden] {
+    display: none !important;
+}
+
+#player .video-player__volume-slider {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    cursor: pointer;
+    touch-action: none;
+    outline: none;
+}
+
+#player .video-player__volume-fill {
+    position: absolute;
+    inset: auto 0 0;
+    height: var(--video-volume, 100%);
+    border-radius: 0 0 100px 100px;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    pointer-events: none;
+}
+
+#player .video-player__volume-slider:focus-visible {
+    outline: 2px solid white;
+    outline-offset: -2px;
+}
+
+#player .video-player__captions-popup {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    z-index: 1;
+    width: 166px;
+    max-height: min(202px, calc(100vh - 96px));
+    box-sizing: border-box;
+    padding: 12px 8px 5px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    background: linear-gradient(90deg, rgba(255,255,255,.1), rgba(255,255,255,.1)),
+                linear-gradient(180deg, rgba(34,36,34,.3), rgba(34,36,34,.6));
+    backdrop-filter: blur(50px);
+    -webkit-backdrop-filter: blur(50px);
+    pointer-events: auto;
+}
+
+#player .video-player__captions-heading {
+    flex: 0 0 auto;
+    margin: 0 6px 8px;
+    color: rgba(255,255,255,.6);
+    font: 13px/16px "Roboto Mono", "SFMono-Regular", ui-monospace, monospace;
+    letter-spacing: -.02em;
+}
+
+#player .video-player__captions-list {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#player .video-player__caption-choice {
+    appearance: none;
+    display: block;
+    width: 100%;
+    min-height: 24px;
+    border: 0;
+    border-radius: 6px;
+    padding: 4px 8px;
+    background: transparent;
+    color: rgba(255,255,255,.8);
+    text-align: left;
+    font: 13px/16px "Roboto Mono", "SFMono-Regular", ui-monospace, monospace;
+    letter-spacing: -.02em;
+    cursor: pointer;
+}
+
+#player .video-player__caption-choice:hover { background: rgba(255,255,255,.08); }
+#player .video-player__caption-choice.is-active { background: rgba(255,255,255,.13); }
+#player .video-player__caption-choice:focus-visible { outline: 2px solid white; outline-offset: -2px; }
+
+#player .video-player__toolbar-state--volume,
+#player .video-player__toolbar-state--cc,
 #player .video-player__toolbar-state--theater,
-#player .video-player__toolbar-state--theater-exit {
-    width: 13px;
-    height: 13px;
-}
-
-#player .video-player__toolbar-state--more {
-    width: 11.667px;
-    height: 2.333px;
+#player .video-player__toolbar-state--theater-exit,
+#player .video-player__toolbar-state--settings {
+    width: 16px;
+    height: 16px;
 }
 
 #player .video-player__timeline-group {
@@ -449,11 +580,13 @@ const referenceCSS = `
 `;
 const SVG_VIDEO_PLAY = `<svg class="video-player__glyph" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g><path fill-rule="evenodd" clip-rule="evenodd" d="M6.67083 1.86812C6.6788 1.87344 6.6868 1.87877 6.69482 1.88411L13.7273 6.57244C13.9308 6.70807 14.1195 6.83382 14.2644 6.95068C14.4156 7.07264 14.5938 7.24175 14.6964 7.48916C14.8321 7.81616 14.8321 8.18367 14.6964 8.51068C14.5938 8.75808 14.4156 8.92719 14.2644 9.04915C14.1195 9.166 13.9308 9.29175 13.7273 9.42737L6.67085 14.1317C6.42213 14.2975 6.19848 14.4467 6.0087 14.5495C5.81879 14.6524 5.55812 14.77 5.25387 14.7519C4.8647 14.7286 4.5052 14.5362 4.26999 14.2253C4.08611 13.9822 4.03937 13.7001 4.01966 13.485C3.99996 13.2701 3.99998 13.0013 4 12.7023L4 3.32634C4 3.31669 4 3.30708 4 3.29751C3.99998 2.99857 3.99996 2.72978 4.01966 2.51483C4.03937 2.29972 4.08611 2.01759 4.26999 1.77452C4.5052 1.4636 4.8647 1.2712 5.25387 1.24796C5.55812 1.2298 5.81879 1.34741 6.0087 1.45033C6.19847 1.55317 6.42212 1.70229 6.67083 1.86812Z" fill="white"/></g></svg>`;
 const SVG_VIDEO_PAUSE = `<svg class="video-player__glyph" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g><rect x="3.33333" y="2" width="2.66667" height="12" rx="1" fill="white"/><rect x="10" y="2" width="2.66667" height="12" rx="1" fill="white"/></g></svg>`;
-const SVG_VIDEO_VOLUME_ON = `<svg class="video-player__glyph" viewBox="0 0 14.3333 12.0572" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.3319 1.36193C13.2768 2.67542 13.8333 4.28702 13.8333 6.0286C13.8333 7.77018 13.2768 9.38178 12.3319 10.6953M9.66354 3.36193C10.1908 4.11782 10.5 5.0371 10.5 6.0286C10.5 7.0201 10.1908 7.93938 9.66354 8.69527M5.58955 0.939056L3.47909 3.04951C3.36379 3.16481 3.30614 3.22247 3.23886 3.26369C3.17921 3.30025 3.11418 3.32718 3.04616 3.34351C2.96943 3.36193 2.8879 3.36193 2.72484 3.36193H1.56667C1.1933 3.36193 1.00662 3.36193 0.864008 3.4346C0.738567 3.49851 0.63658 3.6005 0.572664 3.72594C0.500002 3.86855 0.500002 4.05523 0.500002 4.4286V7.6286C0.500002 8.00197 0.500002 8.18865 0.572664 8.33126C0.63658 8.4567 0.738567 8.55869 0.864008 8.6226C1.00662 8.69527 1.1933 8.69527 1.56667 8.69527H2.72484C2.8879 8.69527 2.96943 8.69527 3.04616 8.71369C3.11418 8.73002 3.17921 8.75695 3.23886 8.79351C3.30614 8.83473 3.36379 8.89238 3.47909 9.00769L5.58954 11.1181C5.87513 11.4037 6.01792 11.5465 6.14052 11.5562C6.24689 11.5645 6.35084 11.5215 6.42014 11.4403C6.5 11.3468 6.5 11.1449 6.5 10.741V1.31618C6.5 0.912303 6.5 0.710365 6.42014 0.616855C6.35084 0.535719 6.24689 0.49266 6.14052 0.501032C6.01792 0.51068 5.87513 0.653472 5.58955 0.939056Z" stroke="white" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const SVG_VIDEO_VOLUME_OFF = `<svg class="video-player__glyph" viewBox="0 0 14.3333 12.0572" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.8333 4.0286L9.83333 8.0286M9.83333 4.0286L13.8333 8.0286M5.58955 0.939056L3.47909 3.04951C3.36379 3.16481 3.30614 3.22247 3.23886 3.26369C3.17921 3.30025 3.11418 3.32718 3.04616 3.34351C2.96943 3.36193 2.8879 3.36193 2.72484 3.36193H1.56667C1.1933 3.36193 1.00662 3.36193 0.864008 3.4346C0.738567 3.49851 0.63658 3.6005 0.572664 3.72594C0.500002 3.86855 0.500002 4.05523 0.500002 4.4286V7.6286C0.500002 8.00197 0.500002 8.18865 0.572664 8.33126C0.63658 8.4567 0.738567 8.55869 0.864008 8.6226C1.00662 8.69527 1.1933 8.69527 1.56667 8.69527H2.72484C2.8879 8.69527 2.96943 8.69527 3.04616 8.71369C3.11418 8.73002 3.17921 8.75695 3.23886 8.79351C3.30614 8.83473 3.36379 8.89238 3.47909 9.00769L5.58954 11.1181C5.87513 11.4037 6.01792 11.5465 6.14052 11.5562C6.24689 11.5645 6.35084 11.5215 6.42014 11.4403C6.5 11.3468 6.5 11.1449 6.5 10.741V1.31618C6.5 0.912303 6.5 0.710365 6.42014 0.616855C6.35084 0.535719 6.24689 0.49266 6.14052 0.501032C6.01792 0.51068 5.87513 0.653472 5.58955 0.939056Z" stroke="white" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const SVG_VIDEO_FULLSCREEN = `<svg class="video-player__glyph" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.83333 5.16667L12.5 0.5M12.5 0.5H8.5M12.5 0.5V4.5M5.16667 7.83333L0.5 12.5M0.5 12.5H4.5M0.5 12.5L0.5 8.5" stroke="white" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const SVG_VIDEO_FULLSCREEN_EXIT = `<svg class="video-player__glyph" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0.5 3.83333H0.633333C1.75344 3.83333 2.31349 3.83333 2.74131 3.61535C3.11764 3.4236 3.4236 3.11764 3.61535 2.74131C3.83333 2.31349 3.83333 1.75344 3.83333 0.633333V0.5M0.5 9.16667H0.633333C1.75344 9.16667 2.31349 9.16667 2.74131 9.38465C3.11764 9.5764 3.4236 9.88236 3.61535 10.2587C3.83333 10.6865 3.83333 11.2466 3.83333 12.3667V12.5M9.16667 0.5V0.633333C9.16667 1.75344 9.16667 2.31349 9.38465 2.74131C9.5764 3.11764 9.88236 3.4236 10.2587 3.61535C10.6865 3.83333 11.2466 3.83333 12.3667 3.83333H12.5M9.16667 12.5V12.3667C9.16667 11.2466 9.16667 10.6865 9.38465 10.2587C9.5764 9.88236 9.88236 9.5764 10.2587 9.38465C10.6865 9.16667 11.2466 9.16667 12.3667 9.16667H12.5" stroke="white" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const SVG_VIDEO_MORE = `<svg class="video-player__glyph" viewBox="0 0 11.6667 2.33333" fill="none" xmlns="http://www.w3.org/2000/svg"><g><path d="M5.83333 1.83333C6.20152 1.83333 6.5 1.53486 6.5 1.16667C6.5 0.798477 6.20152 0.5 5.83333 0.5C5.46514 0.5 5.16667 0.798477 5.16667 1.16667C5.16667 1.53486 5.46514 1.83333 5.83333 1.83333Z" stroke="white" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 1.83333C10.8682 1.83333 11.1667 1.53486 11.1667 1.16667C11.1667 0.798477 10.8682 0.5 10.5 0.5C10.1318 0.5 9.83333 0.798477 9.83333 1.16667C9.83333 1.53486 10.1318 1.83333 10.5 1.83333Z" stroke="white" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.16667 1.83333C1.53486 1.83333 1.83333 1.53486 1.83333 1.16667C1.83333 0.798477 1.53486 0.5 1.16667 0.5C0.798477 0.5 0.5 0.798477 0.5 1.16667C0.5 1.53486 0.798477 1.83333 1.16667 1.83333Z" stroke="white" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+const SVG_VIDEO_VOLUME_ON = '__FIGMA_VOLUME_ON__';
+const SVG_VIDEO_VOLUME_OFF = '__FIGMA_VOLUME_OFF__';
+const SVG_VIDEO_CAPTIONS_OFF = '__FIGMA_CAPTIONS_OFF__';
+const SVG_VIDEO_CAPTIONS_ON = '__FIGMA_CAPTIONS_ON__';
+const SVG_VIDEO_THEATER_OFF = '__FIGMA_THEATER_OFF__';
+const SVG_VIDEO_THEATER_ON = '__FIGMA_THEATER_ON__';
+const SVG_VIDEO_SETTINGS = '__FIGMA_SETTINGS__';
 const style = document.createElement('style');
 style.textContent = referenceCSS + `
 html,body { margin:0!important; padding:0!important; background:transparent!important; overflow:hidden!important; }
@@ -524,8 +657,12 @@ function nativeVideoEngine(video) {
         audioTracks: () => video.audioTracks,
         qualityLevels: () => [],
         currentSources: () => [{
-            label: (video.dataset.quality || tr('本地缓存'))
-                .replace('（本地缓存）', window.yootubeLanguage === 'en' ? ' (local cache)' : '（本地缓存）'),
+            label: (() => {
+                const height = video.dataset.quality?.match(/^\d+p/)?.[0];
+                if (!height) return tr('本地缓存');
+                return height + (window.yootubeLanguage === 'en'
+                    ? ` (${tr('本地缓存')})` : `（${tr('本地缓存')}）`);
+            })(),
             selected:true
         }],
         tech: () => null,
@@ -596,10 +733,22 @@ function install() {
               <div class="video-player__time"><span data-current class="video-player__time-current">0:00</span><span class="video-player__time-separator">/</span><span data-duration class="video-player__time-duration">0:00</span></div>
             </div>
             <div class="video-player__toolbar">
-              ${button('mute', tr('静音'), state('volume-on', SVG_VIDEO_VOLUME_ON, 'volume') + state('volume-off', SVG_VIDEO_VOLUME_OFF, 'volume', true))}
-              ${button('captions', tr('开启字幕'), state('cc', 'CC', 'cc'))}
-              ${button('theater', tr('影院模式'), state('theater', SVG_VIDEO_FULLSCREEN, 'theater') + state('theater-exit', SVG_VIDEO_FULLSCREEN_EXIT, 'theater-exit', true))}
-              ${button('menu', tr('更多'), state('more', SVG_VIDEO_MORE, 'more'))}
+              <div class="video-player__toolbar-anchor video-player__toolbar-anchor--volume">
+                ${button('mute', tr('音量'), state('volume-on', SVG_VIDEO_VOLUME_ON, 'volume') + state('volume-off', SVG_VIDEO_VOLUME_OFF, 'volume', true))}
+                <div class="video-player__volume-popup" id="yootube-volume-popup" hidden>
+                  <div class="video-player__volume-fill" aria-hidden="true"></div>
+                  <div class="video-player__volume-slider" role="slider" tabindex="0" aria-label="${tr('音量')}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"></div>
+                </div>
+              </div>
+              <div class="video-player__toolbar-anchor">
+                ${button('captions', tr('开启字幕'), state('cc-off', SVG_VIDEO_CAPTIONS_OFF, 'cc') + state('cc-on', SVG_VIDEO_CAPTIONS_ON, 'cc', true))}
+                <div class="video-player__captions-popup" id="yootube-captions-popup" hidden>
+                  <div class="video-player__captions-heading">${tr('字幕/CC')}</div>
+                  <div class="video-player__captions-list"></div>
+                </div>
+              </div>
+              ${button('theater', tr('影院模式'), state('theater', SVG_VIDEO_THEATER_OFF, 'theater') + state('theater-exit', SVG_VIDEO_THEATER_ON, 'theater-exit', true))}
+              ${button('menu', tr('播放设置'), state('settings', SVG_VIDEO_SETTINGS, 'settings'))}
             </div>
           </div>`;
         const menu = document.createElement('div');
@@ -625,6 +774,11 @@ function install() {
         const timeline = find('.video-player__timeline');
         const tooltip = find('.video-player__timeline-tooltip');
         const hoverLine = find('.video-player__timeline-hover-line');
+        const volumeAnchor = find('.video-player__toolbar-anchor--volume');
+        const volumePopup = find('.video-player__volume-popup');
+        const volumeSlider = find('.video-player__volume-slider');
+        const captionsPopup = find('.video-player__captions-popup');
+        const captionsList = find('.video-player__captions-list');
         const qualityPreferenceKey = 'yootube.player.qualityHeight';
         let preferredQualityHeight = null;
         try {
@@ -680,13 +834,19 @@ function install() {
             label('toggle', tr(playing ? '暂停' : '播放'));
             const muted = engine.muted() || engine.volume() === 0;
             icons('volume-on', 'volume-off', muted);
-            label('mute', tr(muted ? '取消静音' : '静音'));
+            label('mute', tr('音量'));
+            action('mute').setAttribute('aria-pressed', String(muted));
+            const volumePercent = Math.round((muted ? 0 : clamp(Number(engine.volume()) || 0)) * 100);
+            volumePopup.style.setProperty('--video-volume', `${volumePercent}%`);
+            volumeSlider.setAttribute('aria-valuenow', String(volumePercent));
             const captions = captionTracks();
             const captionsOn = captions.some(track => track.mode === 'showing');
             action('captions').disabled = captions.length === 0;
             action('captions').classList.toggle('is-active', captionsOn);
             action('captions').setAttribute('aria-pressed', String(captionsOn));
+            icons('cc-off', 'cc-on', captionsOn);
             label('captions', tr(captions.length ? (captionsOn ? '关闭字幕' : '开启字幕') : '当前视频没有字幕'));
+            if (!captionsPopup.hidden) renderCaptionPopup();
             icons('theater', 'theater-exit', theaterMode);
             action('theater').classList.toggle('is-active', theaterMode);
             action('theater').setAttribute('aria-pressed', String(theaterMode));
@@ -744,9 +904,16 @@ function install() {
             action('menu').setAttribute('aria-expanded', 'false');
             if (restoreFocus) action('menu').focus();
         }
+        function closePopups() {
+            volumePopup.hidden = true;
+            captionsPopup.hidden = true;
+            action('mute').setAttribute('aria-expanded', 'false');
+            action('captions').setAttribute('aria-expanded', 'false');
+        }
         function setTheaterMode(value) {
             theaterMode = value;
             closeMenu();
+            closePopups();
             window.webkit?.messageHandlers?.detailPlayback?.postMessage(value ? 'theater' : 'standard');
             sync();
         }
@@ -754,6 +921,12 @@ function install() {
         window.yootubeSetPlayerFullScreen = value => {
             nativePlayerFullScreen = !!value;
             document.documentElement.classList.toggle('yootube-player-fullscreen', nativePlayerFullScreen);
+            if (nativePlayerFullScreen) {
+                closeMenu();
+                closePopups();
+                clearHover();
+                if (document.activeElement === timeline) timeline.blur();
+            }
         };
         window.yootubeToggleTheaterMode = () => setTheaterMode(!theaterMode);
         function menuButton(text, callback, selected = false) {
@@ -906,6 +1079,28 @@ function install() {
                     select: () => setCaption(track)
                 }))];
         }
+        let captionPopupSignature = null;
+        function renderCaptionPopup() {
+            const choices = captionChoices();
+            const signature = JSON.stringify(choices.map(choice => [choice.label, choice.selected]));
+            if (signature === captionPopupSignature) return;
+            captionPopupSignature = signature;
+            captionsList.replaceChildren();
+            choices.forEach(choice => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'video-player__caption-choice';
+                button.textContent = choice.label === tr('关闭字幕') ? tr('关闭') : choice.label;
+                button.classList.toggle('is-active', choice.selected);
+                button.setAttribute('aria-pressed', String(choice.selected));
+                button.addEventListener('click', () => {
+                    closePopups();
+                    choice.select();
+                    sync();
+                });
+                captionsList.appendChild(button);
+            });
+        }
         function audioChoices() {
             return audioTracks().map((track, index, tracks) => ({
                 label: track.label || track.language || `${tr('音轨')} ${index + 1}`,
@@ -972,36 +1167,101 @@ function install() {
             sync();
         }
         window.yootubeSetLanguage = language => {
-            window.yootubeLanguage = language === 'en' ? 'en' : 'zh-Hans';
+            window.yootubeLanguage = ['zh-Hans', 'zh-Hant', 'en', 'ja'].includes(language) ? language : 'zh-Hans';
             timeline.setAttribute('aria-label', tr('视频进度'));
             menu.setAttribute('aria-label', tr('播放设置'));
-            label('menu', tr('更多'));
+            volumeSlider.setAttribute('aria-label', tr('音量'));
+            find('.video-player__captions-heading').textContent = tr('字幕/CC');
+            label('menu', tr('播放设置'));
             if (!menu.hidden) buildMenu();
             sync();
         };
         action('menu').setAttribute('aria-controls', menu.id);
         action('menu').setAttribute('aria-expanded', 'false');
+        action('mute').setAttribute('aria-controls', volumePopup.id);
+        action('mute').setAttribute('aria-expanded', 'false');
+        action('captions').setAttribute('aria-controls', captionsPopup.id);
+        action('captions').setAttribute('aria-expanded', 'false');
         action('toggle').addEventListener('click', toggle);
         function toggleMute() {
             if (engine.volume() === 0) { engine.volume(0.5); engine.muted(false); }
             else engine.muted(!engine.muted());
             sync();
         }
+        function showVolumePopup() {
+            closeMenu(); closePopups();
+            volumePopup.hidden = false;
+            action('mute').setAttribute('aria-expanded', 'true');
+        }
+        let volumePointer = null;
+        volumeAnchor.addEventListener('mouseenter', showVolumePopup);
+        volumeAnchor.addEventListener('mouseleave', () => {
+            if (volumePointer === null) closePopups();
+        });
+        action('mute').addEventListener('focus', showVolumePopup);
         action('mute').addEventListener('click', toggleMute);
-        action('captions').addEventListener('click', toggleCaptions);
+        function setVolume(value) {
+            const volume = clamp(value);
+            engine.volume(volume);
+            engine.muted(volume === 0);
+            sync();
+        }
+        function volumeAt(y) {
+            const rect = volumeSlider.getBoundingClientRect();
+            return rect.height ? clamp((rect.bottom - y) / rect.height) : 0;
+        }
+        volumeSlider.addEventListener('pointerdown', e => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            volumePointer = e.pointerId;
+            try { volumeSlider.setPointerCapture(volumePointer); } catch {}
+            setVolume(volumeAt(e.clientY));
+        });
+        volumeSlider.addEventListener('pointermove', e => {
+            if (e.pointerId === volumePointer) setVolume(volumeAt(e.clientY));
+        });
+        const finishVolumeDrag = e => {
+            if (e.pointerId !== volumePointer) return;
+            volumePointer = null;
+            if (!volumeAnchor.matches(':hover')) closePopups();
+        };
+        volumeSlider.addEventListener('pointerup', finishVolumeDrag);
+        volumeSlider.addEventListener('pointercancel', finishVolumeDrag);
+        volumeSlider.addEventListener('lostpointercapture', () => { volumePointer = null; });
+        volumeSlider.addEventListener('keydown', e => {
+            const current = engine.muted() ? 0 : engine.volume();
+            const value = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? current + 0.05
+                : e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? current - 0.05
+                : e.key === 'Home' ? 0 : e.key === 'End' ? 1 : null;
+            if (value === null) return;
+            e.preventDefault(); e.stopPropagation();
+            setVolume(value);
+        });
+        action('captions').addEventListener('click', () => {
+            const shouldOpen = captionsPopup.hidden;
+            closeMenu(); closePopups();
+            if (shouldOpen) renderCaptionPopup();
+            captionsPopup.hidden = !shouldOpen;
+            action('captions').setAttribute('aria-expanded', String(shouldOpen));
+        });
         window.yootubeToggleMute = toggleMute;
         window.yootubeToggleCaptions = toggleCaptions;
         action('theater').addEventListener('click', () => setTheaterMode(!theaterMode));
         action('menu').addEventListener('click', () => {
             if (!menu.hidden) return closeMenu();
+            closePopups();
             buildMenu(); menu.hidden = false;
             action('menu').setAttribute('aria-expanded', 'true');
         });
         document.addEventListener('pointerdown', e => {
             if (!menu.contains(e.target) && !action('menu').contains(e.target)) closeMenu();
+            if (!volumePopup.contains(e.target) && !action('mute').contains(e.target) &&
+                !captionsPopup.contains(e.target) && !action('captions').contains(e.target)) closePopups();
         }, true);
         document.addEventListener('focusin', e => {
             if (!menu.contains(e.target) && !action('menu').contains(e.target)) closeMenu();
+            if (!volumePopup.contains(e.target) && !action('mute').contains(e.target) &&
+                !captionsPopup.contains(e.target) && !action('captions').contains(e.target)) closePopups();
         });
         const isMediaSurface = target => target &&
             !target.closest('.video-player__controls,.video-player__menu,button,a,input,select,textarea');
@@ -1088,7 +1348,8 @@ function install() {
             if (e.metaKey || e.ctrlKey || e.altKey || target.matches('input,textarea,select,[contenteditable=true]')) return;
             let handled = true;
             if (e.key === 'Escape') {
-                if (!menu.hidden) closeMenu(true);
+                if (!volumePopup.hidden || !captionsPopup.hidden) closePopups();
+                else if (!menu.hidden) closeMenu(true);
                 else if (nativePlayerFullScreen) {
                     const bridge = window.webkit?.messageHandlers?.detailPlayback;
                     if (bridge) bridge.postMessage('exitPlayerFullScreen');
@@ -1104,7 +1365,7 @@ function install() {
             }
             else if (e.key === 't') setTheaterMode(!theaterMode);
             else if (e.key === 'c') toggleCaptions();
-            else if (e.key === 'm') action('mute').click();
+            else if (e.key === 'm') toggleMute();
             else if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && e.target === timeline) {
                 if (duration()) {
                     const next = e.key === 'Home' ? 0 : e.key === 'End' ? duration() : engine.currentTime() + (e.key === 'ArrowLeft' ? -5 : 5);
@@ -1150,7 +1411,7 @@ function install() {
             if (qualityApplyTimer !== null) clearTimeout(qualityApplyTimer);
             if (captionApplyTimer !== null) clearTimeout(captionApplyTimer);
         });
-        window.addEventListener('blur', () => { closeMenu(); finishScrubbing(); });
+        window.addEventListener('blur', () => { closeMenu(); closePopups(); finishScrubbing(); });
         applyPreferredQuality();
         if (!engine.paused() && !engine.ended()) handlePlaying();
         sync();

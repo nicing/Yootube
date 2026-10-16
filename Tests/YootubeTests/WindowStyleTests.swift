@@ -10,6 +10,7 @@ final class WindowStyleTests: XCTestCase {
                               styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
         window.isReleasedWhenClosed = false
         defer { window.close() }
+        window.toolbar = NSToolbar(identifier: "WindowStyleTests")
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         StandardWindowChrome.apply(to: window)
@@ -17,7 +18,8 @@ final class WindowStyleTests: XCTestCase {
         XCTAssertFalse(window.styleMask.contains(.fullSizeContentView))
         XCTAssertFalse(window.titlebarAppearsTransparent)
         XCTAssertEqual(window.titleVisibility, .visible)
-        XCTAssertEqual(window.titlebarSeparatorStyle, .line)
+        XCTAssertEqual(window.titlebarSeparatorStyle, .none)
+        XCTAssertEqual(window.toolbar?.showsBaselineSeparator, false)
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             let control = try XCTUnwrap(window.standardWindowButton(button))
             XCTAssertFalse(control.isHidden)

@@ -40,15 +40,46 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.t("Save"), "Save")
     }
 
+    func testTraditionalChineseUsesLocalizedInterfaceAndPreservesNames() {
+        UserDefaults.standard.set(AppLanguage.zhHant.rawValue, forKey: AppLanguage.defaultsKey)
+
+        XCTAssertEqual(L10n.t("设置"), "設定")
+        XCTAssertEqual(L10n.t("视频缓存"), "影片快取")
+        XCTAssertEqual(L10n.t("12 个视频"), "12 個影片")
+        XCTAssertEqual(L10n.t("打开收藏夹 Work"), "開啟收藏夾 Work")
+        XCTAssertEqual(L10n.t("General"), "通用")
+    }
+
+    func testJapaneseUsesLocalizedInterfaceAndDynamicLabels() {
+        UserDefaults.standard.set(AppLanguage.japanese.rawValue, forKey: AppLanguage.defaultsKey)
+
+        XCTAssertEqual(L10n.t("设置"), "設定")
+        XCTAssertEqual(L10n.t("数据与缓存"), "データとキャッシュ")
+        XCTAssertEqual(L10n.t("12 个视频"), "12 件の動画")
+        XCTAssertEqual(L10n.t("打开收藏夹 Work"), "フォルダを開く: Work")
+        XCTAssertEqual(L10n.t("1080p（本地缓存）"), "1080p（ローカルキャッシュ）")
+        XCTAssertEqual(L10n.t("General"), "一般")
+    }
+
     func testLanguageOwnsEveryExternalLocaleIdentifier() {
         XCTAssertEqual(AppLanguage.zhHans.localeIdentifier, "zh-Hans")
         XCTAssertEqual(AppLanguage.zhHans.invidiousLanguageCode, "zh-CN")
         XCTAssertEqual(AppLanguage.zhHans.acceptLanguageHeader, "zh-CN,zh;q=0.9")
         XCTAssertEqual(AppLanguage.zhHans.playerLanguageCode, "zh-Hans")
 
+        XCTAssertEqual(AppLanguage.zhHant.localeIdentifier, "zh-Hant")
+        XCTAssertEqual(AppLanguage.zhHant.invidiousLanguageCode, "zh-TW")
+        XCTAssertEqual(AppLanguage.zhHant.acceptLanguageHeader, "zh-TW,zh-Hant;q=0.9,zh;q=0.8")
+        XCTAssertEqual(AppLanguage.zhHant.playerLanguageCode, "zh-Hant")
+
         XCTAssertEqual(AppLanguage.english.localeIdentifier, "en")
         XCTAssertEqual(AppLanguage.english.invidiousLanguageCode, "en-US")
         XCTAssertEqual(AppLanguage.english.acceptLanguageHeader, "en-US,en;q=0.9")
         XCTAssertEqual(AppLanguage.english.playerLanguageCode, "en")
+
+        XCTAssertEqual(AppLanguage.japanese.localeIdentifier, "ja")
+        XCTAssertEqual(AppLanguage.japanese.invidiousLanguageCode, "ja")
+        XCTAssertEqual(AppLanguage.japanese.acceptLanguageHeader, "ja-JP,ja;q=0.9")
+        XCTAssertEqual(AppLanguage.japanese.playerLanguageCode, "ja")
     }
 }

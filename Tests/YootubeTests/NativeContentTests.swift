@@ -72,6 +72,22 @@ final class NativeContentTests: XCTestCase {
         XCTAssertNotNil(browser.videoDetail)
     }
 
+    @MainActor
+    func testReloadingNativeContentPublishesARefreshWithoutChangingTheRoute() throws {
+        let browser = BrowserModel()
+        let searchURL = try XCTUnwrap(URL(string: "\(base.absoluteString)/search?q=swift"))
+        browser.loadPage(searchURL)
+        let initialSequence = browser.nativePageReloadSequence
+
+        browser.reload()
+
+        XCTAssertEqual(browser.nativePageReloadSequence, initialSequence + 1)
+        guard case .search(let route) = browser.nativeRoute else {
+            return XCTFail("Reload should keep the current native route")
+        }
+        XCTAssertEqual(route.query, "swift")
+    }
+
     func testNativeSearchModelsDecodeAllSupportedCardTypes() throws {
         let data = Data(#"""
         [

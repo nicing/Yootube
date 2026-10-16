@@ -154,6 +154,21 @@ final class VideoDetailTests: XCTestCase {
         model.stop()
     }
 
+    func testPortraitPlayerFitsInsideTheVisibleViewportWithoutChangingAspectRatio() {
+        let portrait = fittedPlayerSize(
+            maxWidth: 900, aspectRatio: 9.0 / 16.0, maxHeight: 700
+        )
+        XCTAssertEqual(portrait.height, 700, accuracy: 0.001)
+        XCTAssertEqual(portrait.width, 393.75, accuracy: 0.001)
+        XCTAssertEqual(portrait.width / portrait.height, 9.0 / 16.0, accuracy: 0.001)
+
+        let landscape = fittedPlayerSize(
+            maxWidth: 900, aspectRatio: 16.0 / 9.0, maxHeight: 700
+        )
+        XCTAssertEqual(landscape.width, 900, accuracy: 0.001)
+        XCTAssertEqual(landscape.height, 506.25, accuracy: 0.001)
+    }
+
     func testFKeyCyclesThroughTheaterFullScreenAndDefault() {
         XCTAssertEqual(PlayerDisplayCycleAction.resolve(theaterMode: false, playerFullScreen: false),
                        .enterTheater)
@@ -311,5 +326,19 @@ final class VideoDetailTests: XCTestCase {
         browser.goBack()
         XCTAssertTrue(browser.showsHome)
         XCTAssertNil(browser.videoDetail)
+    }
+
+    @MainActor
+    func testReloadingVideoRecreatesTheEntireDetailPage() throws {
+        let browser = BrowserModel()
+        let url = try XCTUnwrap(VideoRoute.watchURL(id: "sZSlTDlo0Ag"))
+        browser.loadPage(url)
+        let original = try XCTUnwrap(browser.videoDetail)
+
+        browser.reload()
+
+        let reloaded = try XCTUnwrap(browser.videoDetail)
+        XCTAssertFalse(original === reloaded)
+        XCTAssertEqual(reloaded.route.id, "sZSlTDlo0Ag")
     }
 }

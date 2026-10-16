@@ -46,6 +46,17 @@ enum PlaybackKeyboardShortcut {
     }
 }
 
+enum PlayerFullScreenKeyboardShortcut {
+    static func matches(_ event: NSEvent, playerIsFullScreen: Bool) -> Bool {
+        let blockedModifiers: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+        return playerIsFullScreen &&
+            event.type == .keyDown &&
+            !event.isARepeat &&
+            event.charactersIgnoringModifiers?.lowercased() == "f" &&
+            event.modifierFlags.intersection(blockedModifiers).isEmpty
+    }
+}
+
 @MainActor
 final class BrowserModel: NSObject, ObservableObject {
     @Published private(set) var title = "Yootube"
@@ -60,6 +71,7 @@ final class BrowserModel: NSObject, ObservableObject {
     @Published private(set) var showsHome = true
     @Published private(set) var videoDetail: VideoDetailModel?
     @Published private(set) var nativeRoute: NativePageRoute?
+    @Published private(set) var nativePageReloadSequence = 0
     let history = WatchHistory()
 
     private var observations: [NSKeyValueObservation] = []
@@ -114,7 +126,14 @@ final class BrowserModel: NSObject, ObservableObject {
     }
 
     func reload() {
-        if let videoDetail { videoDetail.reload(); return }
+        if let videoDetail {
+            load(url: videoDetail.route.source)
+            return
+        }
+        if nativeRoute != nil {
+            nativePageReloadSequence += 1
+            return
+        }
         errorMessage = nil
         if webView.url == nil {
             loadHome()
@@ -258,6 +277,13 @@ private final class PlaybackKeyMonitor {
             guard let detail = self?.browser?.videoDetail else { return event }
             let window = event.window ?? NSApp.keyWindow
             guard detail.player.window === window else { return event }
+            if PlayerFullScreenKeyboardShortcut.matches(
+                event,
+                playerIsFullScreen: detail.playerFullScreen || detail.player.isInFullScreenMode
+            ) {
+                detail.cycleDisplayMode()
+                return nil
+            }
             let responder = window?.firstResponder
             if let view = responder as? NSView,
                view === detail.player || view.isDescendant(of: detail.player) {

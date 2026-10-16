@@ -10,6 +10,18 @@ private struct PlayerBoundsKey: PreferenceKey {
     }
 }
 
+func fittedPlayerSize(maxWidth: CGFloat, aspectRatio: Double,
+                      maxHeight: CGFloat) -> CGSize {
+    guard maxWidth > 0, maxHeight > 0,
+          aspectRatio.isFinite, aspectRatio > 0 else { return .zero }
+    let ratio = CGFloat(aspectRatio)
+    let naturalHeight = maxWidth / ratio
+    if naturalHeight <= maxHeight {
+        return CGSize(width: maxWidth, height: naturalHeight)
+    }
+    return CGSize(width: maxHeight * ratio, height: maxHeight)
+}
+
 struct VideoDetailView: View {
     @ObservedObject var model: VideoDetailModel
     @ObservedObject var favorites: FavoritesStore
@@ -27,6 +39,7 @@ struct VideoDetailView: View {
             let wide = geometry.size.width >= 1080
             let contentPadding: CGFloat = 24
             let availableWidth = geometry.size.width - contentPadding * 2
+            let availablePlayerHeight = geometry.size.height - contentPadding * 2
             let contentWidth = model.playerTheaterMode ? availableWidth : min(availableWidth, 1440)
             let videoWidth = wide ? contentWidth - 336 : contentWidth
             let detailLayout = wide
@@ -35,12 +48,12 @@ struct VideoDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     if model.playerTheaterMode {
-                        playerPlaceholder(width: contentWidth)
+                        playerPlaceholder(maxWidth: contentWidth, maxHeight: availablePlayerHeight)
                     }
                     detailLayout {
                         VStack(alignment: .leading, spacing: 22) {
                             if !model.playerTheaterMode {
-                                playerPlaceholder(width: videoWidth)
+                                playerPlaceholder(maxWidth: videoWidth, maxHeight: availablePlayerHeight)
                             }
                             detailSections
                         }
@@ -119,10 +132,20 @@ struct VideoDetailView: View {
         }
     }
 
-    private func playerPlaceholder(width: CGFloat) -> some View {
-        Color.clear
-            .frame(width: width, height: width / model.playerAspectRatio)
-            .anchorPreference(key: PlayerBoundsKey.self, value: .bounds) { $0 }
+    private func playerPlaceholder(maxWidth: CGFloat, maxHeight: CGFloat) -> some View {
+        let size = fittedPlayerSize(
+            maxWidth: maxWidth,
+            aspectRatio: model.playerAspectRatio,
+            maxHeight: maxHeight
+        )
+        return HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            Color.clear
+                .frame(width: size.width, height: size.height)
+                .anchorPreference(key: PlayerBoundsKey.self, value: .bounds) { $0 }
+            Spacer(minLength: 0)
+        }
+        .frame(width: maxWidth, height: size.height)
     }
 
     @ViewBuilder

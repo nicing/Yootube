@@ -42,13 +42,12 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             settingsSidebar
-            Divider()
             settingsDetail
         }
         .frame(width: 760, height: 560)
         .background(KumoTheme.canvas)
         .foregroundStyle(KumoTheme.text)
-        .buttonStyle(KumoButtonStyle())
+        .buttonStyle(SettingsQuietButtonStyle())
         .tint(KumoTheme.brand)
         .background {
             KeyboardShortcutsShortcutMonitor { showsKeyboardShortcuts = true }
@@ -83,46 +82,44 @@ struct SettingsView: View {
     }
 
     private var settingsSidebar: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(L10n.t("设置"))
-                .font(.system(size: 22, weight: .semibold))
-                .padding(.horizontal, 12)
-                .padding(.top, 4)
-
-            VStack(spacing: 4) {
-                ForEach(SettingsCategory.allCases) { item in
-                    SettingsCategoryButton(item: item, selected: category == item) {
-                        category = item
-                    }
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(SettingsCategory.allCases) { item in
+                SettingsCategoryButton(item: item, selected: category == item) {
+                    category = item
                 }
             }
             Spacer(minLength: 0)
             HStack(spacing: 7) {
-                KumoIcon("lock", size: 14)
+                KumoIcon("lock", size: 13)
                 Text(L10n.t("数据保存在本地"))
                     .font(.system(size: 11))
             }
             .foregroundStyle(KumoTheme.subtle)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 4)
         }
-        .padding(12)
-        .frame(width: 190)
+        .padding(.horizontal, 12)
+        .padding(.top, 16)
+        .padding(.bottom, 14)
+        .frame(width: 196)
         .background(KumoTheme.sidebar)
     }
 
     private var settingsDetail: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 28) {
                 Text(category.title)
-                    .font(.system(size: 24, weight: .semibold))
-                    .tracking(-0.3)
+                    .font(.system(size: 20, weight: .semibold))
+                    .tracking(-0.2)
                 switch category {
                 case .general: generalSettings
                 case .data: dataSettings
                 case .service: serviceSettings
                 }
             }
-            .padding(28)
+            .padding(.horizontal, 32)
+            .padding(.top, 26)
+            .padding(.bottom, 32)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -130,53 +127,58 @@ struct SettingsView: View {
     }
 
     private var generalSettings: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            SettingsGroup(title: L10n.t("语言")) {
-                SettingsRow(icon: "globe", title: L10n.t("App 语言"),
-                            detail: L10n.t("更改会立即应用到所有窗口。")) {
-                    Picker(L10n.t("语言"), selection: $language) {
-                        ForEach(AppLanguage.allCases) { option in
-                            Text(option.title).tag(option)
+        VStack(spacing: 0) {
+            SettingsRow(title: L10n.t("App 语言"),
+                        detail: L10n.t("更改会立即应用到所有窗口。")) {
+                Menu {
+                    ForEach(AppLanguage.allCases) { option in
+                        Button {
+                            language = option
+                        } label: {
+                            if language == option {
+                                Label(option.title, systemImage: "checkmark")
+                            } else {
+                                Text(option.title)
+                            }
                         }
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 210)
-                }
-            }
-
-            SettingsGroup(title: L10n.t("外观")) {
-                HStack(spacing: 8) {
-                    ForEach(AppAppearance.allCases) { mode in
-                        Button { appearance = mode } label: {
-                            KumoLabel(mode.title, icon: mode.icon)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(KumoButtonStyle(variant: appearance == mode ? .primary : .secondary))
-                        .accessibilityValue(appearance == mode ? L10n.t("已选择") : L10n.t("未选择"))
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(language.title)
+                        Spacer(minLength: 8)
+                        KumoIcon("caret-down", size: 12)
                     }
+                    .frame(width: 110)
                 }
-                .padding(12)
+                .menuIndicator(.hidden)
+                .buttonStyle(SettingsQuietButtonStyle())
             }
-
-            SettingsGroup(title: L10n.t("键盘")) {
-                SettingsRow(icon: "code", title: L10n.t("键盘快捷键"),
-                            detail: L10n.t("查看导航、收藏夹和视频播放快捷键，也可以随时按 ? 打开。")) {
-                    Button(L10n.t("查看快捷键")) { showsKeyboardShortcuts = true }
-                }
+            SettingsRow(title: L10n.t("外观")) {
+                SettingsSegmentedControl(options: AppAppearance.allCases,
+                                          title: { $0.title },
+                                          selection: $appearance)
+            }
+            SettingsRow(title: L10n.t("键盘快捷键"),
+                        detail: L10n.t("查看导航、收藏夹和视频播放快捷键，也可以随时按 ? 打开。")) {
+                Button(L10n.t("查看快捷键")) { showsKeyboardShortcuts = true }
             }
         }
     }
 
     private var dataSettings: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 32) {
             SettingsGroup(title: L10n.t("本地数据"),
                           footer: L10n.t("视频缓存不会包含在备份文件中。")) {
-                SettingsRow(icon: "lock", title: L10n.t("数据保存在本地"),
-                            detail: L10n.t("频道订阅、收藏夹、播放列表和最近观看只保存在此 Mac。")) {
-                    EmptyView()
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L10n.t("数据保存在本地"))
+                        .font(.system(size: 13, weight: .medium))
+                    Text(L10n.t("频道订阅、收藏夹、播放列表和最近观看只保存在此 Mac。"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(KumoTheme.subtle)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                SettingsDivider()
+                .padding(.vertical, 10)
+
                 HStack(spacing: 8) {
                     Button { chooseImportFile() } label: {
                         KumoLabel(L10n.t("导入备份"), icon: "download-simple")
@@ -184,20 +186,19 @@ struct SettingsView: View {
                     Button { exportBackup() } label: {
                         KumoLabel(L10n.t("导出备份"), icon: "floppy-disk")
                     }
-                    Spacer()
+                    Spacer(minLength: 8)
                     Button(L10n.t("打开数据目录")) { service.revealDataDirectory() }
                 }
-                .padding(12)
+                .padding(.bottom, 4)
             }
 
             SettingsGroup(title: L10n.t("缓存")) {
-                SettingsRow(icon: "hard-drive", title: L10n.t("图片缓存"),
+                SettingsRow(title: L10n.t("图片缓存"),
                             detail: L10n.t("封面、头像和横幅 · 已使用 \(imageCacheSizeText) / 300 MB")) {
                     Button(L10n.t("清除")) { clearImageCache() }
                         .disabled(imageCacheBytes == 0)
                 }
-                SettingsDivider()
-                SettingsRow(icon: "video-camera", title: L10n.t("视频缓存"),
+                SettingsRow(title: L10n.t("视频缓存"),
                             detail: L10n.t("\(videoCache.entries.count) 个视频 · \(videoCacheSizeText)")) {
                     Button(L10n.t("清除")) { showsClearVideoCacheConfirmation = true }
                         .disabled(videoCache.entries.isEmpty || videoCache.isCaching)
@@ -207,17 +208,16 @@ struct SettingsView: View {
     }
 
     private var serviceSettings: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             SettingsGroup(title: L10n.t("本地 Invidious"),
                           footer: L10n.t("Invidious、PostgreSQL 和视频代理随 Yootube 启动，只监听此 Mac 的回环地址。出站连接使用 macOS 系统代理。")) {
-                SettingsRow(icon: "check-circle", title: L10n.t("运行状态"), detail: statusDetail) {
+                SettingsRow(title: L10n.t("运行状态"), detail: statusDetail) {
                     HStack(spacing: 7) {
                         Circle().fill(statusColor).frame(width: 7, height: 7)
-                        Text(statusText).font(.system(size: 12, weight: .medium))
+                        Text(statusText).font(.system(size: 13, weight: .medium))
                     }
                 }
-                SettingsDivider()
-                SettingsRow(icon: "link-simple", title: L10n.t("服务地址"), detail: nil) {
+                SettingsRow(title: L10n.t("服务地址")) {
                     Text("127.0.0.1:38473")
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(KumoTheme.subtle)
@@ -227,7 +227,7 @@ struct SettingsView: View {
 
             HStack(spacing: 8) {
                 Button(L10n.t("重启本地服务")) { service.restart() }
-                    .buttonStyle(KumoButtonStyle(variant: .primary))
+                    .buttonStyle(SettingsPrimaryButtonStyle())
                 Button(L10n.t("打开日志目录")) { service.revealLogsDirectory() }
             }
         }
@@ -388,13 +388,14 @@ private struct SettingsCategoryButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                KumoIcon(item.icon, size: 17).frame(width: 20)
+                KumoIcon(item.icon, size: 18)
+                    .frame(width: 18, height: 18)
                 Text(item.title)
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
                 Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -417,59 +418,149 @@ private struct SettingsGroup<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(KumoTheme.subtle)
-                .padding(.leading, 4)
-            VStack(spacing: 0) { content() }
-                .background(KumoTheme.base, in: RoundedRectangle(cornerRadius: KumoTheme.radiusPanel))
+            VStack(alignment: .leading, spacing: 0) { content() }
             if let footer {
                 Text(footer)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(KumoTheme.subtle)
+                    .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 4)
+                    .padding(.top, 4)
             }
         }
     }
 }
 
 private struct SettingsRow<Trailing: View>: View {
-    let icon: String
     let title: String
     let detail: String?
     @ViewBuilder let trailing: () -> Trailing
 
-    init(icon: String, title: String, detail: String?, @ViewBuilder trailing: @escaping () -> Trailing) {
-        self.icon = icon
+    init(title: String, detail: String? = nil, @ViewBuilder trailing: @escaping () -> Trailing) {
         self.title = title
         self.detail = detail
         self.trailing = trailing
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            KumoIcon(icon, size: 17)
-                .foregroundStyle(KumoTheme.subtle)
-                .frame(width: 22)
+        HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.system(size: 13, weight: .medium))
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(KumoTheme.subtle)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer(minLength: 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             trailing()
+                .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(.horizontal, 14)
-        .frame(minHeight: 58)
+        .padding(.vertical, 13)
+        .frame(minHeight: 48)
     }
 }
 
-private struct SettingsDivider: View {
-    var body: some View { Divider().padding(.leading, 48) }
+private struct SettingsSegmentedControl<Option: Hashable>: View {
+    let options: [Option]
+    let title: (Option) -> String
+    @Binding var selection: Option
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hovered: Option?
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options, id: \.self) { option in
+                segment(option)
+            }
+        }
+        .padding(3)
+        .background(track, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: selection)
+    }
+
+    private func segment(_ option: Option) -> some View {
+        let selected = selection == option
+        return Button {
+            selection = option
+        } label: {
+            Text(title(option))
+                .font(.system(size: 13, weight: selected ? .medium : .regular))
+                .foregroundStyle(selected ? KumoTheme.text : KumoTheme.subtle)
+                .padding(.horizontal, 10)
+                .frame(minWidth: 76, minHeight: 26)
+                .background(segmentFill(selected: selected, option: option),
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityValue(selected ? L10n.t("已选择") : L10n.t("未选择"))
+        .onHover { hovering in
+            hovered = hovering ? option : (hovered == option ? nil : hovered)
+        }
+    }
+
+    private var track: Color {
+        colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.05)
+    }
+
+    private func segmentFill(selected: Bool, option: Option) -> Color {
+        if selected {
+            return colorScheme == .dark ? Color.white.opacity(0.14) : KumoTheme.canvas
+        }
+        if hovered == option {
+            return colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.04)
+        }
+        return .clear
+    }
+}
+
+private struct SettingsQuietButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        SettingsFillButtonBody(configuration: configuration, prominent: false)
+    }
+}
+
+private struct SettingsPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        SettingsFillButtonBody(configuration: configuration, prominent: true)
+    }
+}
+
+private struct SettingsFillButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let prominent: Bool
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var hovered = false
+
+    var body: some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .padding(.horizontal, 10)
+            .frame(minHeight: 30)
+            .foregroundStyle(prominent ? KumoTheme.bodyOnDark : KumoTheme.text)
+            .background(fill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .opacity(enabled ? 1 : 0.4)
+            .onHover { hovered = $0 }
+    }
+
+    private var fill: Color {
+        let hot = enabled && (hovered || configuration.isPressed)
+        if prominent {
+            return KumoTheme.brand.opacity(hot ? 0.84 : 1)
+        }
+        if colorScheme == .dark {
+            return Color.white.opacity(hot ? 0.12 : 0.06)
+        }
+        return Color.black.opacity(hot ? 0.08 : 0.045)
+    }
 }

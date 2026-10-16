@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct YootubeApp: App {
@@ -46,7 +47,7 @@ struct YootubeApp: App {
                 Button(L10n.t("展开/收起侧栏")) {
                     NotificationCenter.default.post(name: .toggleSidebar, object: nil)
                 }
-                .keyboardShortcut("s", modifiers: [.command, .control])
+                .keyboardShortcut("b", modifiers: .command)
             }
         }
 
@@ -82,19 +83,55 @@ struct StandardWindowChrome: NSViewRepresentable {
             guard let window else { return }
             StandardWindowChrome.apply(to: window)
             window.backgroundColor = KumoTheme.windowColor(dark: dark)
+            DispatchQueue.main.async {
+                StandardWindowChrome.apply(to: window)
+                StandardWindowChrome.applyToolbarMaterial(to: window, dark: self.dark)
+            }
         }
     }
 
     static func apply(to window: NSWindow) {
         // Let AppKit own fullscreen transitions; page updates must not alter them.
         guard !window.styleMask.contains(.fullScreen) else { return }
-        let required: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
+        let required: NSWindow.StyleMask = [
+            .titled, .closable, .miniaturizable, .resizable, .unifiedTitleAndToolbar
+        ]
         let style = window.styleMask.union(required).subtracting(.fullSizeContentView)
         if window.styleMask != style { window.styleMask = style }
         if window.titlebarAppearsTransparent { window.titlebarAppearsTransparent = false }
         if window.titleVisibility != .visible { window.titleVisibility = .visible }
-        if window.titlebarSeparatorStyle != .line { window.titlebarSeparatorStyle = .line }
+        if window.titlebarSeparatorStyle != .none { window.titlebarSeparatorStyle = .none }
+        if window.toolbar?.showsBaselineSeparator == true {
+            window.toolbar?.showsBaselineSeparator = false
+        }
         if window.isMovableByWindowBackground { window.isMovableByWindowBackground = false }
+    }
+
+    static func applyToolbarMaterial(to window: NSWindow, dark: Bool) {
+        guard !window.styleMask.contains(.fullScreen),
+              let contentView = window.contentView,
+              let frameView = contentView.superview else { return }
+        window.titlebarSeparatorStyle = .none
+        window.toolbar?.showsBaselineSeparator = false
+        let titlebarOrigin = contentView.frame.maxY
+        for view in frameView.subviews where view !== contentView && view.frame.maxY > titlebarOrigin {
+            updateTitlebarEffects(in: view, titlebarWidth: frameView.bounds.width, dark: dark)
+        }
+    }
+
+    private static func updateTitlebarEffects(in view: NSView, titlebarWidth: CGFloat, dark: Bool) {
+        if view.frame.height > 0, view.frame.height <= 1,
+           view.frame.width >= titlebarWidth - 1 {
+            view.isHidden = true
+        }
+        if let effect = view as? NSVisualEffectView,
+           effect.material == .contentBackground {
+            effect.material = .sidebar
+            effect.alphaValue = dark ? 0 : 0.50
+        }
+        view.subviews.forEach {
+            updateTitlebarEffects(in: $0, titlebarWidth: titlebarWidth, dark: dark)
+        }
     }
 }
 
@@ -106,13 +143,15 @@ extension Notification.Name {
     static let newFavoriteFolder = Notification.Name("Yootube.newFavoriteFolder")
     static let showVideoFavoritePicker = Notification.Name("Yootube.showVideoFavoritePicker")
     static let showVideoCachePicker = Notification.Name("Yootube.showVideoCachePicker")
+    static let openChannelUpdateVideo = Notification.Name("Yootube.openChannelUpdateVideo")
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private var terminationSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UNUserNotificationCenter.current().delegate = self
         terminationSources = [SIGTERM, SIGINT].map { signalNumber in
             signal(signalNumber, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
@@ -130,5 +169,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         LocalServiceManager.shared.stop()
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler:
+                                            @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            didReceive response: UNNotificationResponse,
+                                            withCompletionHandler completionHandler: @escaping () -> Void) {
+        guard let videoID = response.notification.request.content.userInfo["videoID"] as? String,
+              VideoRoute.watchURL(id: videoID) != nil else {
+            completionHandler()
+            return
+        }
+        UserDefaults.standard.set(videoID, forKey: "pendingChannelNotificationVideoID")
+        completionHandler()
+        Task { @MainActor in
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            NotificationCenter.default.post(name: .openChannelUpdateVideo, object: nil)
+        }
     }
 }

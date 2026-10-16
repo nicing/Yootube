@@ -30,18 +30,18 @@ enum KumoTheme {
             return color(isDark ? dark : light, alpha: isDark ? darkAlpha : lightAlpha)
         })
     }
-    static let sidebar = adaptive("KumoSidebar", light: 0xF5F5F7, dark: 0x272729)
-    static let canvas = adaptive("KumoCanvas", light: 0xFFFFFF, dark: 0x272729)
+    static let sidebar = adaptive("KumoSidebar", light: 0xF5F6F7, dark: 0x1E1E1E)
+    static let canvas = adaptive("KumoCanvas", light: 0xFFFFFF, dark: 0x2A2A2C)
     static let base = adaptive("KumoBase", light: 0xFAFAFC, dark: 0x2A2A2C)
-    static let recessed = adaptive("KumoRecessed", light: 0xF5F5F7, dark: 0x252527)
+    static let recessed = adaptive("KumoRecessed", light: 0xF5F5F7, dark: 0x272729)
     static let tint = adaptive("KumoTint", light: 0xD2D2D7, dark: 0x333333,
                                lightAlpha: 0.64)
     static let line = adaptive("KumoLine", light: 0xE0E0E0, dark: 0x333333)
     static let text = adaptive("KumoText", light: 0x1D1D1F, dark: 0xFFFFFF)
     static let subtle = adaptive("KumoSubtle", light: 0x7A7A7A, dark: 0xCCCCCC)
     static let focus = adaptive("KumoFocus", light: 0x1D1D1F, dark: 0xFFFFFF)
-    static let placeholder = adaptive("KumoPlaceholder", light: 0xF5F5F7, dark: 0x252527)
-    static let skeleton = adaptive("KumoSkeleton", light: 0xF0F0F0, dark: 0x252527)
+    static let placeholder = adaptive("KumoPlaceholder", light: 0xF5F5F7, dark: 0x272729)
+    static let skeleton = adaptive("KumoSkeleton", light: 0xF0F0F0, dark: 0x272729)
     static let skeletonHighlight = adaptive("KumoSkeletonHighlight", light: 0xFAFAFC, dark: 0x2A2A2C)
     static let selectedShortcut = adaptive("KumoSelectedShortcut", light: 0xD2D2D7, dark: 0x252527)
     static let ink = Color(nsColor: color(0x1D1D1F))
@@ -51,26 +51,29 @@ enum KumoTheme {
     static let radiusSmall: CGFloat = 8
     static let radius: CGFloat = 10
     static let radiusPanel: CGFloat = 14
-    static func windowColor(dark: Bool) -> NSColor { color(dark ? 0x272729 : 0xF5F5F7) }
+    static func windowColor(dark: Bool) -> NSColor { color(dark ? 0x1E1E1E : 0xF5F5F6) }
 }
 
 struct KumoButtonStyle: ButtonStyle {
     enum Variant { case secondary, primary, ghost, row }
     var variant: Variant = .secondary
+    var horizontalPadding: CGFloat? = nil
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
-        ButtonBody(configuration: configuration, variant: variant, enabled: enabled)
+        ButtonBody(configuration: configuration, variant: variant, enabled: enabled,
+                   horizontalPadding: horizontalPadding ?? (variant == .row ? 8 : 12))
     }
     private struct ButtonBody: View {
         let configuration: Configuration
         let variant: Variant
         let enabled: Bool
+        let horizontalPadding: CGFloat
         @State private var hovered = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         var body: some View {
             configuration.label
                 .font(.system(size: 13, weight: .medium))
-                .padding(.horizontal, variant == .row ? 8 : 12)
+                .padding(.horizontal, horizontalPadding)
                 .frame(minHeight: 36)
                 .foregroundStyle(variant == .primary ? KumoTheme.bodyOnDark : KumoTheme.text)
                 .background(background, in: RoundedRectangle(cornerRadius: KumoTheme.radius))

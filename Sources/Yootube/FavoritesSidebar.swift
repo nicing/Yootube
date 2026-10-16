@@ -20,47 +20,49 @@ struct FavoritesSidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Button(action: goHome) {
-                HStack(spacing: 10) {
-                    KumoIcon("house", size: 18)
-                        .frame(width: 18, height: 18)
-                    Text(L10n.t("首页"))
-                        .font(.system(size: 13, weight: isHome ? .semibold : .regular))
-                    Spacer(minLength: 0)
-                    if showsShortcutHints {
-                        SidebarShortcutHintBadge(label: SidebarShortcutHints.homeLabel,
-                                                 emphasized: isHome)
+            VStack(alignment: .leading, spacing: 6) {
+                Button(action: goHome) {
+                    HStack(spacing: 10) {
+                        KumoIcon("house", size: 18)
+                            .frame(width: 18, height: 18)
+                        Text(L10n.t("首页"))
+                            .font(.system(size: 13, weight: isHome ? .semibold : .regular))
+                        Spacer(minLength: 0)
+                        if showsShortcutHints {
+                            SidebarShortcutHintBadge(label: SidebarShortcutHints.homeLabel,
+                                                     emphasized: isHome)
+                        }
                     }
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-                .padding(.horizontal, 12)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .background(isHome || homeHovered ? KumoTheme.tint : .clear,
-                        in: RoundedRectangle(cornerRadius: KumoTheme.radiusSmall))
-            .onHover { homeHovered = $0 }
-            .help(L10n.t("首页"))
-            .accessibilityLabel(L10n.t("首页"))
+                .buttonStyle(.plain)
+                .background(isHome || homeHovered ? KumoTheme.tint : .clear,
+                            in: RoundedRectangle(cornerRadius: KumoTheme.radiusSmall))
+                .onHover { homeHovered = $0 }
+                .help(L10n.t("首页"))
+                .accessibilityLabel(L10n.t("首页"))
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(favorites.folders.enumerated()), id: \.element.id) { index, folder in
-                        if let insertion = folderDropInsertion,
-                           insertion == FolderDropInsertion(targetFolderID: folder.id, placeAfter: false) {
-                            folderInsertionPlaceholder(insertion)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(favorites.folders.enumerated()), id: \.element.id) { index, folder in
+                            if let insertion = folderDropInsertion,
+                               insertion == FolderDropInsertion(targetFolderID: folder.id, placeAfter: false) {
+                                folderInsertionPlaceholder(insertion)
+                            }
+                            folderRow(folder, at: index)
+                            if let insertion = folderDropInsertion,
+                               insertion == FolderDropInsertion(targetFolderID: folder.id, placeAfter: true) {
+                                folderInsertionPlaceholder(insertion)
+                            }
                         }
-                        folderRow(folder, at: index)
-                        if let insertion = folderDropInsertion,
-                           insertion == FolderDropInsertion(targetFolderID: folder.id, placeAfter: true) {
-                            folderInsertionPlaceholder(insertion)
+                        if !favorites.isLoaded {
+                            Button(L10n.t("重新读取收藏夹")) { favorites.reload() }
                         }
                     }
-                    if !favorites.isLoaded {
-                        Button(L10n.t("重新读取收藏夹")) { favorites.reload() }
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
             Spacer(minLength: 0)
             Button { editingFolder = nil; showsEditor = true } label: {
@@ -69,6 +71,9 @@ struct FavoritesSidebar: View {
                         .frame(width: 18, height: 18)
                     Text(L10n.t("新建收藏夹"))
                     Spacer(minLength: 0)
+                    if showsShortcutHints {
+                        SidebarShortcutHintBadge(label: SidebarShortcutHints.newFolderLabel)
+                    }
                 }
                 .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             }
@@ -82,6 +87,9 @@ struct FavoritesSidebar: View {
                     KumoIcon("gear-six").frame(width: 18, height: 18)
                     Text(L10n.t("设置"))
                     Spacer(minLength: 0)
+                    if showsShortcutHints {
+                        SidebarShortcutHintBadge(label: SidebarShortcutHints.settingsLabel)
+                    }
                 }
                 .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             }
@@ -90,7 +98,7 @@ struct FavoritesSidebar: View {
             .accessibilityLabel(L10n.t("设置"))
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.bottom, 12)
         .frame(width: 232)
         .background(KumoTheme.sidebar)
         .onChange(of: favorites.folders.map(\.id)) { _, _ in
@@ -317,6 +325,8 @@ private func loadPayload(from provider: NSItemProvider, contentType: UTType,
 
 enum SidebarShortcutHints {
     static let homeLabel = "1"
+    static let newFolderLabel = "N"
+    static let settingsLabel = ","
 
     static func labels(forFolderAt index: Int, folderCount: Int) -> [String] {
         guard index >= 0, index < folderCount else { return [] }

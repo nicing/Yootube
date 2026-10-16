@@ -5,12 +5,20 @@ private struct PendingPageLoad {
     let replayDirection: BrowserHistoryReplayDirection?
 }
 
+func canOpenPageImmediately(_ url: URL, serviceReady: Bool,
+                            cachedVideoIDs: Set<String>) -> Bool {
+    if serviceReady { return true }
+    guard let route = VideoRoute(url) else { return false }
+    return cachedVideoIDs.contains(route.id)
+}
+
 struct ContentView: View {
     @Environment(\.openSettings) private var openSettings
     @StateObject private var browser = BrowserModel()
     @StateObject private var service = LocalServiceManager.shared
     @StateObject private var favorites = FavoritesStore()
     @StateObject private var subscriptions = ChannelSubscriptionStore()
+    @StateObject private var channelNotifications = ChannelNotificationStore()
     @StateObject private var videoCache = VideoCacheStore.shared
     @StateObject private var toolbarTooltipController = ToolbarTooltipController()
     @State private var selectedFolderID: UUID?
@@ -20,13 +28,27 @@ struct ContentView: View {
     @State private var pendingPageLoad: PendingPageLoad?
     @State private var showsNewFolder = false
     @State private var showsKeyboardShortcuts = false
+    @State private var showsChannelNotifications = false
     @State private var commandKeyPressed = false
     @FocusState private var searchFocused: Bool
+    @State private var searchEditing = false
     @AppStorage("sidebarExpanded") private var sidebarExpanded = true
 
     private let canvas = KumoTheme.canvas
+    private let channelUpdateTimer = Timer.publish(every: 15 * 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
+        contentWithDataObservers
+            .sheet(isPresented: $showsNewFolder) {
+                FolderNameSheet(favorites: favorites, didSave: selectFolder)
+            }
+            .sheet(isPresented: $showsKeyboardShortcuts) {
+                KeyboardShortcutsSheet()
+            }
+            .modifier(ContentErrorAlerts(favorites: favorites, subscriptions: subscriptions))
+    }
+
+    private var windowContent: some View {
         HStack(spacing: 0) {
             if sidebarExpanded {
                 FavoritesSidebar(favorites: favorites, selectedFolderID: selectedFolderID,
@@ -35,13 +57,24 @@ struct ContentView: View {
                     .zIndex(1)
             }
             mainContent
+                .overlay(alignment: .topTrailing) {
+                    if showsChannelNotifications {
+                        ChannelNotificationsPanel(
+                            store: channelNotifications,
+                            close: { showsChannelNotifications = false },
+                            open: openChannelNotification
+                        )
+                        .padding(.leading, 6)
+                        .padding(.bottom, 6)
+                        .zIndex(10)
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 20))
-                .padding(.top, 8)
                 .padding(.trailing, 8)
                 .padding(.bottom, 8)
                 .padding(.leading, sidebarExpanded ? 0 : 8)
         }
-        .background(KumoTheme.sidebar)
+        .background(sidebarExpanded ? KumoTheme.sidebar : canvas)
         .background {
             AppKeyboardShortcutMonitor(hasVideoDetail: browser.videoDetail != nil,
                                        modifierFlagsChanged: { flags in
@@ -55,7 +88,17 @@ struct ContentView: View {
         .tint(KumoTheme.brand)
         .buttonStyle(KumoButtonStyle())
         .toolbar { applicationToolbar }
-        .onAppear { service.start() }
+        .toolbarBackground(KumoTheme.sidebar, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
+        .modifier(WindowContainerBackground())
+    }
+
+    private var contentWithAppObservers: some View {
+        windowContent
+        .onAppear {
+            service.start()
+            openPendingChannelNotification()
+        }
         .onDisappear { toolbarTooltipController.hide() }
         .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in sidebarExpanded.toggle() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
@@ -69,6 +112,7 @@ struct ContentView: View {
                 pendingPageLoad = nil
                 browser.loadPage(pending.url, replayDirection: pending.replayDirection)
             }
+            if state == .ready { checkForChannelUpdates() }
         }
         .onChange(of: browser.pageChange) { _, change in
             synchronizeBrowserPage(change)
@@ -77,6 +121,13 @@ struct ContentView: View {
             focusSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: .goHome)) { _ in goHome() }
+        .onReceive(NotificationCenter.default.publisher(for: .openChannelUpdateVideo)) { _ in
+            openPendingChannelNotification()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            checkForChannelUpdates()
+        }
+        .onReceive(channelUpdateTimer) { _ in checkForChannelUpdates() }
         .onReceive(NotificationCenter.default.publisher(for: .localDataImported)) { _ in
             favorites.reload()
             subscriptions.reload()
@@ -85,16 +136,16 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .appLanguageDidChange)) { _ in
             browser.videoDetail?.updateLanguage()
         }
+    }
+
+    private var contentWithDataObservers: some View {
+        contentWithAppObservers
         .onChange(of: favorites.folders.map(\.id)) { _, ids in
             if let id = selectedFolderID, !ids.contains(id) { goHome() }
         }
-        .sheet(isPresented: $showsNewFolder) {
-            FolderNameSheet(favorites: favorites, didSave: selectFolder)
+        .onChange(of: subscriptions.channels.map(\.id)) { _, _ in
+            checkForChannelUpdates()
         }
-        .sheet(isPresented: $showsKeyboardShortcuts) {
-            KeyboardShortcutsSheet()
-        }
-        .modifier(ContentErrorAlerts(favorites: favorites, subscriptions: subscriptions))
     }
 
     @ToolbarContentBuilder
@@ -102,7 +153,7 @@ struct ContentView: View {
         if #available(macOS 26.0, *) {
             ToolbarItem(placement: .navigation) {
                 toolbarButton("sidebar-simple", label: sidebarExpanded ? L10n.t("收起侧栏") : L10n.t("展开侧栏"),
-                              shortcut: "/", enabled: true, action: toggleSidebar)
+                              shortcut: "⌘B", enabled: true, action: toggleSidebar)
             }
             .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .principal) {
@@ -110,22 +161,40 @@ struct ContentView: View {
             }
             .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .primaryAction) {
-                toolbarButton("house", label: L10n.t("首页"), shortcut: "H", enabled: true, action: goHome)
-                    .padding(.trailing, 8)
+                toolbarTrailingActions
             }
             .sharedBackgroundVisibility(.hidden)
         } else {
             ToolbarItem(placement: .navigation) {
                 toolbarButton("sidebar-simple", label: sidebarExpanded ? L10n.t("收起侧栏") : L10n.t("展开侧栏"),
-                              shortcut: "/", enabled: true, action: toggleSidebar)
+                              shortcut: "⌘B", enabled: true, action: toggleSidebar)
             }
             ToolbarItem(placement: .principal) {
                 toolbarNavigationAndSearch
             }
             ToolbarItem(placement: .primaryAction) {
-                toolbarButton("house", label: L10n.t("首页"), shortcut: "H", enabled: true, action: goHome)
-                    .padding(.trailing, 8)
+                toolbarTrailingActions
             }
+        }
+    }
+
+    private var toolbarTrailingActions: some View {
+        HStack(spacing: 0) {
+            toolbarButton("house", label: L10n.t("首页"), shortcut: "H", enabled: true, action: goHome)
+                .offset(x: -4)
+            toolbarButton("bell", label: L10n.t("频道更新"), shortcut: "U", enabled: true,
+                          action: toggleChannelNotifications)
+            .overlay(alignment: .topTrailing) {
+                if channelNotifications.unreadCount > 0 {
+                    Circle()
+                        .fill(KumoTheme.brand)
+                        .frame(width: 8, height: 8)
+                        .offset(x: -3, y: 4)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+            .offset(x: -4)
         }
     }
 
@@ -136,6 +205,8 @@ struct ContentView: View {
                               enabled: canNavigateBack, action: toolbarGoBack)
                 toolbarButton("arrow-right", label: L10n.t("前进"), shortcut: "→",
                               enabled: canNavigateForward, action: toolbarGoForward)
+                toolbarButton("arrow-clockwise", label: L10n.t("刷新"), shortcut: "R",
+                              enabled: true, action: refreshCurrentPage)
             }
             toolbarSearch
         }
@@ -154,17 +225,17 @@ struct ContentView: View {
                 }
             } else if browser.showsHome {
                 home
+            } else if let detail = browser.videoDetail {
+                VideoDetailView(model: detail, favorites: favorites, videoCache: videoCache,
+                                sidebarExpanded: $sidebarExpanded,
+                                navigate: navigateFromDetail)
+                    .id(detail.route.source)
             } else if service.state == .ready {
-                if let detail = browser.videoDetail {
-                    VideoDetailView(model: detail, favorites: favorites, videoCache: videoCache,
-                                    sidebarExpanded: $sidebarExpanded,
-                                    navigate: navigateFromDetail)
-                        .id(detail.route.source)
-                } else if let route = browser.nativeRoute {
+                if let route = browser.nativeRoute {
                     NativeContentView(route: route, favorites: favorites, subscriptions: subscriptions,
                                       navigate: navigateFromDetail,
                                       didSavePlaylist: selectFolder)
-                        .id(route.id)
+                        .id("\(route.id):\(browser.nativePageReloadSequence)")
                 } else {
                     WebView(model: browser)
                 }
@@ -192,12 +263,14 @@ struct ContentView: View {
             KumoIcon("magnifying-glass", size: 17)
                 .foregroundStyle(KumoTheme.subtle)
             TextField(L10n.t("搜索或粘贴 YouTube 链接"), text: $query,
-                      prompt: Text(L10n.t("搜索或粘贴 YouTube 链接")).foregroundStyle(KumoTheme.subtle))
+                      onEditingChanged: { searchEditing = $0 })
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .foregroundStyle(KumoTheme.text)
                 .focused($searchFocused)
+                .accessibilityIdentifier(ToolbarSearchFieldLocator.identifier.rawValue)
                 .onSubmit { submit(query) }
+                .frame(maxWidth: .infinity)
                 .onChange(of: query) { previous, value in
                     if URLRouting.isBulkInsertion(from: previous, to: value),
                        URLRouting.youtubeDestination(for: value, instanceURL: LocalServiceManager.invidiousURL) != nil {
@@ -210,8 +283,9 @@ struct ContentView: View {
         }
         .padding(.horizontal, 13)
         .frame(width: 420, height: 36)
-        .background(KumoTheme.base, in: Capsule())
-        .overlay(Capsule().strokeBorder(searchFocused ? KumoTheme.focus : KumoTheme.line, lineWidth: 1))
+        .background(KumoTheme.sidebar, in: Capsule())
+        .overlay(Capsule().strokeBorder(searchEditing ? KumoTheme.focus : KumoTheme.line, lineWidth: 1)
+            .allowsHitTesting(false))
         .accessibilityElement(children: .contain)
     }
 
@@ -223,6 +297,11 @@ struct ContentView: View {
 
     private func toggleSidebar() {
         sidebarExpanded.toggle()
+    }
+
+    private func toggleChannelNotifications() {
+        toolbarTooltipController.hide()
+        showsChannelNotifications.toggle()
     }
 
     private func focusSearch() {
@@ -242,6 +321,8 @@ struct ContentView: View {
             focusSearch()
         case .home:
             goHome()
+        case .channelUpdates:
+            toggleChannelNotifications()
         case .keyboardShortcuts:
             showsKeyboardShortcuts = true
         case .favoriteFolder(let index):
@@ -253,6 +334,8 @@ struct ContentView: View {
             if canNavigateBack { toolbarGoBack() }
         case .forward:
             if canNavigateForward { toolbarGoForward() }
+        case .refresh:
+            refreshCurrentPage()
         case .newFavoriteFolder:
             if favorites.isLoaded { showsNewFolder = true }
         case .settings:
@@ -381,6 +464,27 @@ struct ContentView: View {
         visitAndShow(.page(channel.url))
     }
 
+    private func openChannelNotification(_ notification: ChannelUpdateNotification) {
+        showsChannelNotifications = false
+        guard let url = notification.videoURL else { return }
+        visitAndShow(.page(url))
+    }
+
+    private func checkForChannelUpdates() {
+        guard service.state == .ready, subscriptions.isLoaded else { return }
+        let channels = subscriptions.channels
+        Task { await channelNotifications.checkForUpdates(in: channels) }
+    }
+
+    private func openPendingChannelNotification() {
+        let key = "pendingChannelNotificationVideoID"
+        guard let videoID = UserDefaults.standard.string(forKey: key),
+              let url = VideoRoute.watchURL(id: videoID) else { return }
+        UserDefaults.standard.removeObject(forKey: key)
+        channelNotifications.markVideoRead(videoID)
+        visitAndShow(.page(url))
+    }
+
     private func toolbarGoBack() {
         while let destination = navigation.goBack() {
             if show(destination, replayDirection: .backward) { return }
@@ -390,6 +494,22 @@ struct ContentView: View {
     private func toolbarGoForward() {
         while let destination = navigation.goForward() {
             if show(destination, replayDirection: .forward) { return }
+        }
+    }
+
+    private func refreshCurrentPage() {
+        switch navigation.current {
+        case .home:
+            subscriptions.reload()
+            browser.history.reload()
+        case .folder:
+            favorites.reload()
+        case .page:
+            if pendingPageLoad != nil {
+                service.start()
+            } else {
+                browser.reload()
+            }
         }
     }
 
@@ -405,7 +525,7 @@ struct ContentView: View {
     @discardableResult
     private func show(_ destination: AppDestination,
                       replayDirection: BrowserHistoryReplayDirection? = nil) -> Bool {
-        searchFocused = false
+        resignSearchFieldEditor()
         switch destination {
         case .home:
             query = toolbarQuery(for: destination)
@@ -419,10 +539,13 @@ struct ContentView: View {
             pendingPageLoad = nil
             browser.loadHome()
         case .page(let url):
-            resignSearchFieldEditor()
             query = toolbarQuery(for: destination, submittedYouTubeLink: submittedYouTubeLinks[url])
             selectedFolderID = nil
-            if service.state == .ready {
+            if canOpenPageImmediately(
+                url,
+                serviceReady: service.state == .ready,
+                cachedVideoIDs: Set(videoCache.entries.keys)
+            ) {
                 pendingPageLoad = nil
                 browser.loadPage(url, replayDirection: replayDirection)
             } else {
@@ -435,6 +558,7 @@ struct ContentView: View {
 
     private func resignSearchFieldEditor() {
         searchFocused = false
+        searchEditing = false
         DispatchQueue.main.async {
             guard let window = NSApp.keyWindow,
                   let fieldEditor = window.firstResponder as? NSTextView,
@@ -457,6 +581,17 @@ struct ContentView: View {
             if !navigation.replaceCurrent(from: .page(sourceURL), with: destination) {
                 navigation.visit(destination)
             }
+        }
+    }
+}
+
+private struct WindowContainerBackground: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.containerBackground(KumoTheme.sidebar, for: .window)
+        } else {
+            content
         }
     }
 }
@@ -487,6 +622,7 @@ private struct ContentErrorAlerts: ViewModifier {
 }
 
 enum ToolbarSearchFieldLocator {
+    static let identifier = NSUserInterfaceItemIdentifier("Yootube.ToolbarSearchField")
     static var placeholder: String { L10n.t("搜索或粘贴 YouTube 链接") }
 
     @MainActor
@@ -501,7 +637,7 @@ enum ToolbarSearchFieldLocator {
     static func find(in view: NSView?) -> NSTextField? {
         guard let view else { return nil }
         if let field = view as? NSTextField,
-           field.placeholderString == placeholder {
+           field.identifier == identifier {
             return field
         }
         for subview in view.subviews {
@@ -511,11 +647,16 @@ enum ToolbarSearchFieldLocator {
     }
 
     @MainActor
+    static func isFocused(_ field: NSTextField, in window: NSWindow) -> Bool {
+        guard let editor = field.currentEditor() else { return false }
+        return editor === window.firstResponder
+    }
+
+    @MainActor
     static func shouldResignSearch(forClickAt locationInWindow: NSPoint,
                                    in window: NSWindow) -> Bool {
         guard let field = find(in: window.contentView?.superview),
-              let editor = field.currentEditor(),
-              editor === window.firstResponder else { return false }
+              isFocused(field, in: window) else { return false }
         return !field.bounds.contains(field.convert(locationInWindow, from: nil))
     }
 }
@@ -524,11 +665,13 @@ enum AppKeyboardShortcutAction: Equatable {
     case toggleSidebar
     case focusSearch
     case home
+    case channelUpdates
     case keyboardShortcuts
     case favoriteFolder(index: Int)
     case lastFavoriteFolder
     case back
     case forward
+    case refresh
     case newFavoriteFolder
     case settings
     case saveVideo
@@ -556,6 +699,7 @@ enum AppKeyboardShortcut {
             }
             switch key {
             case "k", "f": return .focusSearch
+            case "b": return .toggleSidebar
             case "n": return .newFavoriteFolder
             case ",": return .settings
             default: return nil
@@ -581,8 +725,10 @@ enum AppKeyboardShortcut {
             }
         }
         switch key {
-        case "/": return .toggleSidebar
+        case "[": return .toggleSidebar
         case "h": return .home
+        case "r": return .refresh
+        case "u": return .channelUpdates
         default: return nil
         }
     }
@@ -729,15 +875,19 @@ private struct ToolbarIconTooltip: View {
         HStack(spacing: 5) {
             Text(label)
                 .font(.system(size: 11, weight: .medium))
-            Text(shortcut)
-                .font(.system(size: 9, weight: .medium, design: .rounded))
-                .frame(width: 16, height: 16)
-                .background(KumoTheme.bodyOnDark.opacity(0.13),
-                            in: RoundedRectangle(cornerRadius: 3))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 3)
-                        .strokeBorder(KumoTheme.bodyOnDark.opacity(0.32), lineWidth: 1)
-                }
+            if !shortcut.isEmpty {
+                Text(shortcut)
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 4)
+                    .frame(minWidth: 16, minHeight: 16)
+                    .background(KumoTheme.bodyOnDark.opacity(0.13),
+                                in: RoundedRectangle(cornerRadius: 3))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 3)
+                            .strokeBorder(KumoTheme.bodyOnDark.opacity(0.32), lineWidth: 1)
+                    }
+            }
         }
         .foregroundStyle(KumoTheme.bodyOnDark)
         .padding(.horizontal, 9)

@@ -15,6 +15,23 @@ enum PlayerSkin {
               let script = try? String(contentsOf: url, encoding: .utf8) else {
             preconditionFailure("Missing bundled player controls")
         }
-        return script
+        let icons = [
+            "VOLUME_ON": "player-volume-on",
+            "VOLUME_OFF": "player-volume-off",
+            "CAPTIONS_OFF": "player-captions-off",
+            "CAPTIONS_ON": "player-captions-on",
+            "THEATER_OFF": "player-theater-off",
+            "THEATER_ON": "player-theater-on",
+            "SETTINGS": "player-settings"
+        ]
+        return icons.reduce(script) { result, icon in
+            guard let url = bundle.url(forResource: icon.value, withExtension: "svg", subdirectory: "Icons"),
+                  let svg = try? String(contentsOf: url, encoding: .utf8),
+                  let encoded = try? JSONEncoder().encode(svg),
+                  let literal = String(data: encoded, encoding: .utf8) else {
+                preconditionFailure("Missing bundled player icon: \(icon.value)")
+            }
+            return result.replacingOccurrences(of: "'__FIGMA_\(icon.key)__'", with: literal)
+        }
     }()
 }

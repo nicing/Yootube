@@ -1,8 +1,11 @@
 import Foundation
+import CoreFoundation
 
 enum AppLanguage: String, CaseIterable, Identifiable {
     case zhHans
+    case zhHant
     case english
+    case japanese
 
     static let defaultsKey = "appLanguage"
 
@@ -10,24 +13,37 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var localeIdentifier: String {
         switch self {
         case .zhHans: "zh-Hans"
+        case .zhHant: "zh-Hant"
         case .english: "en"
+        case .japanese: "ja"
         }
     }
     var locale: Locale { Locale(identifier: localeIdentifier) }
     var invidiousLanguageCode: String {
         switch self {
         case .zhHans: "zh-CN"
+        case .zhHant: "zh-TW"
         case .english: "en-US"
+        case .japanese: "ja"
         }
     }
     var acceptLanguageHeader: String {
         switch self {
         case .zhHans: "zh-CN,zh;q=0.9"
+        case .zhHant: "zh-TW,zh-Hant;q=0.9,zh;q=0.8"
         case .english: "en-US,en;q=0.9"
+        case .japanese: "ja-JP,ja;q=0.9"
         }
     }
     var playerLanguageCode: String { localeIdentifier }
-    var title: String { self == .english ? "English" : "简体中文" }
+    var title: String {
+        switch self {
+        case .zhHans: "简体中文"
+        case .zhHant: "繁體中文"
+        case .english: "English"
+        case .japanese: "日本語"
+        }
+    }
     static var current: AppLanguage {
         guard let value = UserDefaults.standard.string(forKey: defaultsKey),
               let language = AppLanguage(rawValue: value) else { return .zhHans }
@@ -37,11 +53,35 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
 enum L10n {
     static func t(_ source: String) -> String {
-        guard AppLanguage.current == .english else {
+        switch AppLanguage.current {
+        case .zhHans:
             return chineseByEnglish[source] ?? translateDynamicToChinese(source)
+        case .english:
+            if let translated = english[source] { return translated }
+            return translateDynamic(source)
+        case .zhHant, .japanese:
+            let chineseSource = chineseByEnglish[source] ?? translateDynamicToChinese(source)
+            if AppLanguage.current == .zhHant {
+                return traditional[chineseSource] ?? translateDynamicToTraditional(chineseSource)
+            }
+            return JapaneseTranslations.strings[chineseSource] ?? translateDynamicToJapanese(chineseSource)
         }
-        if let translated = english[source] { return translated }
-        return translateDynamic(source)
+    }
+
+    private static let traditional: [String: String] = Dictionary(
+        uniqueKeysWithValues: english.keys.map { ($0, traditionalize($0)) }
+    )
+
+    private static func traditionalize(_ source: String) -> String {
+        let converted = NSMutableString(string: source)
+        CFStringTransform(converted, nil, "Hans-Hant" as CFString, false)
+        return (converted as String)
+            .replacingOccurrences(of: "設置", with: "設定")
+            .replacingOccurrences(of: "視頻", with: "影片")
+            .replacingOccurrences(of: "緩存", with: "快取")
+            .replacingOccurrences(of: "播放列表", with: "播放清單")
+            .replacingOccurrences(of: "數據", with: "資料")
+            .replacingOccurrences(of: "本地", with: "本機")
     }
 
     // Runtime status and error text can outlive a language switch. Translate it
@@ -192,6 +232,121 @@ enum L10n {
         Int(source.replacingOccurrences(of: ",", with: ""))
     }
 
+    private static func translateDynamicToTraditional(_ source: String) -> String {
+        let suffixes: [(String, String)] = [
+            (" 个最新视频", " 個最新影片"), (" 个已缓存视频", " 個已快取影片"),
+            (" 个收藏夹", " 個收藏夾"), (" 个频道", " 個頻道"),
+            (" 个视频", " 個影片"), (" 位订阅者", " 位訂閱者"),
+            (" 次观看", " 次觀看")
+        ]
+        for (suffix, replacement) in suffixes where source.hasSuffix(suffix) {
+            return String(source.dropLast(suffix.count)) + replacement
+        }
+        let prefixes: [(String, String)] = [
+            ("打开收藏夹 ", "開啟收藏夾 "), ("打开频道 ", "開啟頻道 "),
+            ("播放收藏 ", "播放收藏的影片 "), ("播放 ", "播放 "),
+            ("从此收藏夹移除 ", "從此收藏夾移除 "),
+            ("取消订阅 ", "取消訂閱 "), ("订阅 ", "訂閱 "),
+            ("图标：", "圖示："), ("颜色：", "顏色："),
+            ("外观：", "外觀：")
+        ]
+        for (prefix, replacement) in prefixes where source.hasPrefix(prefix) {
+            let value = String(source.dropFirst(prefix.count))
+            return replacement + (traditional[value] ?? value)
+        }
+        if source.hasPrefix("打开 "), source.hasSuffix(" 的频道") {
+            return "開啟 " + source.dropFirst(3).dropLast(4) + " 的頻道"
+        }
+        if source.hasPrefix("将删除「"),
+           let end = source.range(of: "」及其中的收藏记录，其他收藏夹中的视频不受影响。") {
+            let name = source[source.index(source.startIndex, offsetBy: 4)..<end.lowerBound]
+            return "將刪除「\(name)」及其中收藏的影片。其他收藏夾中的影片不受影響。"
+        }
+        return traditionalize(source)
+    }
+
+    private static func translateDynamicToJapanese(_ source: String) -> String {
+        let suffixes: [(String, String)] = [
+            (" 个最新视频", " 件の最新動画"), (" 个已缓存视频", " 件のキャッシュ済み動画"),
+            (" 个收藏夹", " 個のフォルダ"), (" 个频道", " 件のチャンネル"),
+            (" 个视频", " 件の動画"), (" 位订阅者", " 人の登録者"),
+            (" 次观看", " 回再生")
+        ]
+        for (suffix, replacement) in suffixes where source.hasSuffix(suffix) {
+            return String(source.dropLast(suffix.count)) + replacement
+        }
+        let prefixes: [(String, String)] = [
+            ("打开收藏夹 ", "フォルダを開く: "), ("打开频道 ", "チャンネルを開く: "),
+            ("播放收藏 ", "保存済み動画を再生: "), ("播放 ", "再生: "),
+            ("从此收藏夹移除 ", "このフォルダから削除: "),
+            ("取消订阅 ", "登録解除: "), ("订阅 ", "登録: "),
+            ("图标：", "アイコン: "), ("颜色：", "色: "),
+            ("外观：", "外観: "),
+            ("画中画启动失败：", "ピクチャ・イン・ピクチャを開始できません: "),
+            ("画中画视频加载失败：", "ピクチャ・イン・ピクチャの動画を読み込めません: "),
+            ("本地占用 ", "ローカル使用量: ")
+        ]
+        for (prefix, replacement) in prefixes where source.hasPrefix(prefix) {
+            let value = String(source.dropFirst(prefix.count))
+            return replacement + (JapaneseTranslations.strings[value] ?? value)
+        }
+        if source.hasPrefix("打开 "), source.hasSuffix(" 的频道") {
+            return "チャンネルを開く: " + source.dropFirst(3).dropLast(4)
+        }
+        if source.hasPrefix("封面、头像和横幅 · 已使用 ") {
+            return "サムネイル、アバター、バナー · 使用量 " + source.dropFirst("封面、头像和横幅 · 已使用 ".count)
+        }
+        if source.contains(" 个视频 · ") {
+            return source.replacingOccurrences(of: " 个视频 · ", with: " 件の動画 · ")
+        }
+        if source.hasPrefix("已使用 ") {
+            return "使用量 " + source.dropFirst(4).replacingOccurrences(of: "，上限 ", with: "、上限 ")
+        }
+        if source.hasPrefix("已缓存 ") {
+            return "キャッシュ済み: " + source.dropFirst(4)
+                .replacingOccurrences(of: "，可更换清晰度或删除本地缓存", with: "。画質の変更やローカルキャッシュの削除ができます")
+                .replacingOccurrences(of: " 个视频，共 ", with: " 件の動画、合計 ")
+        }
+        if source.hasPrefix("本地端口 ") {
+            return "ローカルポート " + source.dropFirst(5)
+                .replacingOccurrences(of: " 已被其他进程占用。请关闭占用该端口的程序后重试。", with: " は他のプロセスで使用中です。そのプロセスを終了してから再試行してください。")
+        }
+        if source.hasPrefix("将删除「"),
+           let end = source.range(of: "」及其中的收藏记录，其他收藏夹中的视频不受影响。") {
+            let name = source[source.index(source.startIndex, offsetBy: 4)..<end.lowerBound]
+            return "「\(name)」とその保存済み動画を削除します。他のフォルダの動画には影響しません。"
+        }
+        if source.hasPrefix("将删除 "), source.contains(" 个已缓存视频") {
+            let count = source.dropFirst(4).split(separator: " ").first ?? "0"
+            return "キャッシュ済み動画を\(count)件削除します。フォルダ、登録チャンネル、視聴履歴には影響しません。"
+        }
+        let qualitySuffixes: [(String, String)] = [
+            ("（高清，有声音）", "（高画質・音声あり）"),
+            ("（有声音）", "（音声あり）"), ("（本地缓存）", "（ローカルキャッシュ）")
+        ]
+        for (suffix, replacement) in qualitySuffixes where source.hasSuffix(suffix) {
+            return String(source.dropLast(suffix.count)) + replacement
+        }
+        let errorSuffixes: [(String, String)] = [
+            (" 启动后立即退出。请查看设置中的日志目录。", " は起動直後に終了しました。設定のログフォルダを確認してください。"),
+            (" 启动超时。请查看设置中的日志目录。", " の起動がタイムアウトしました。設定のログフォルダを確認してください。")
+        ]
+        for (suffix, replacement) in errorSuffixes where source.hasSuffix(suffix) {
+            return String(source.dropLast(suffix.count)) + replacement
+        }
+        if let range = source.range(of: " 启动失败：") {
+            return String(source[..<range.lowerBound]) + " を起動できませんでした: " + source[range.upperBound...]
+        }
+        let fileErrors: [(String, String)] = [
+            ("无法读取本地收藏夹，原文件已保留。请检查文件后重新读取。\n", "ローカルフォルダを読み込めませんでした。元のファイルは保持されています。確認後に再読み込みしてください。\n"),
+            ("无法读取本地订阅，原文件已保留。请检查文件后重新读取。\n", "ローカルの登録チャンネルを読み込めませんでした。元のファイルは保持されています。確認後に再読み込みしてください。\n")
+        ]
+        for (prefix, replacement) in fileErrors where source.hasPrefix(prefix) {
+            return replacement + source.dropFirst(prefix.count)
+        }
+        return source
+    }
+
     private static let english: [String: String] = [
         "书签": "Bookmark", "亮色": "Light", "人物": "People", "从此收藏夹移除": "Remove from this folder",
         "一个完全属于这台 Mac 的私密有序资料库。": "A private, organized library that lives entirely on your Mac.",
@@ -206,7 +361,7 @@ enum L10n {
         "保存": "Save", "保存到收藏夹": "Save to Folders", "保存到本地收藏夹": "Save to a Local Folder",
         "全球": "Global", "全部": "All", "关闭": "Close", "切换外观": "Change appearance",
         "删除": "Delete", "删除收藏夹…": "Delete Folder…", "删除收藏夹？": "Delete Folder?",
-        "删除本地缓存": "Remove Local Cache", "前进": "Forward", "加载更多": "Load More",
+        "删除本地缓存": "Remove Local Cache", "前进": "Forward", "刷新": "Refresh", "加载更多": "Load More",
         "加载更多评论": "Load More Comments", "加载评论": "Load Comments",
         "单键快捷键在输入文字时不会触发。": "Single-key shortcuts are disabled while typing.",
         "取消": "Cancel", "取消订阅": "Unsubscribe",
@@ -233,6 +388,12 @@ enum L10n {
         "当前播放环境无法创建画中画窗口。": "The current playback environment cannot create a Picture in Picture window.",
         "当前视频没有可用于画中画的兼容播放源。": "This video has no compatible source for Picture in Picture.",
         "当前视频没有可缓存的兼容格式": "This video has no compatible format to cache",
+        "频道更新": "Channel Updates", "打开或关闭频道更新": "Show or Hide Channel Updates",
+        "全部已读": "Mark all as read", "开启系统通知": "Enable System Notifications",
+        "频道通知暂时无法读取": "Channel notifications are temporarily unavailable",
+        "订阅频道有新视频时会显示在这里": "New videos from subscribed channels will appear here.",
+        "无法读取频道通知，原文件已保留。": "Channel notifications could not be read. The original file was preserved.",
+        "频道通知保存失败，此次更改未生效。": "Channel notifications could not be saved. The change was not applied.",
         "影院模式 / 播放器全屏": "Theater Mode / Player Full Screen", "打开或关闭左侧栏": "Show or Hide Sidebar",
         "打开数据目录": "Open Data Folder", "接着看": "Up Next", "提醒": "Alerts", "搜索": "Search",
         "搜索或粘贴 YouTube 链接": "Search or paste a YouTube link", "搜索结果": "Search Results",

@@ -8,7 +8,7 @@ import XCTest
 final class KumoAppearanceTests: XCTestCase {
     func testNativeThemeUsesAppleNeutralPaletteInBothAppearances() {
         let light: [(Color, UInt32, CGFloat)] = [
-            (KumoTheme.sidebar, 0xF5F5F7, 1),
+            (KumoTheme.sidebar, 0xF5F6F7, 1),
             (KumoTheme.canvas, 0xFFFFFF, 1),
             (KumoTheme.base, 0xFAFAFC, 1),
             (KumoTheme.recessed, 0xF5F5F7, 1),
@@ -23,17 +23,17 @@ final class KumoAppearanceTests: XCTestCase {
             (KumoTheme.selectedShortcut, 0xD2D2D7, 1)
         ]
         let dark: [(Color, UInt32, CGFloat)] = [
-            (KumoTheme.sidebar, 0x272729, 1),
-            (KumoTheme.canvas, 0x272729, 1),
+            (KumoTheme.sidebar, 0x1E1E1E, 1),
+            (KumoTheme.canvas, 0x2A2A2C, 1),
             (KumoTheme.base, 0x2A2A2C, 1),
-            (KumoTheme.recessed, 0x252527, 1),
+            (KumoTheme.recessed, 0x272729, 1),
             (KumoTheme.tint, 0x333333, 1),
             (KumoTheme.line, 0x333333, 1),
             (KumoTheme.text, 0xFFFFFF, 1),
             (KumoTheme.subtle, 0xCCCCCC, 1),
             (KumoTheme.focus, 0xFFFFFF, 1),
-            (KumoTheme.placeholder, 0x252527, 1),
-            (KumoTheme.skeleton, 0x252527, 1),
+            (KumoTheme.placeholder, 0x272729, 1),
+            (KumoTheme.skeleton, 0x272729, 1),
             (KumoTheme.skeletonHighlight, 0x2A2A2C, 1),
             (KumoTheme.selectedShortcut, 0x252527, 1)
         ]
@@ -43,6 +43,10 @@ final class KumoAppearanceTests: XCTestCase {
         assertColor(KumoTheme.ink, appearance: .aqua, hex: 0x1D1D1F, alpha: 1)
         assertColor(KumoTheme.bodyOnDark, appearance: .aqua, hex: 0xFFFFFF, alpha: 1)
         assertColor(KumoTheme.surfaceBlack, appearance: .aqua, hex: 0x000000, alpha: 1)
+        assertColor(Color(nsColor: KumoTheme.windowColor(dark: false)),
+                    appearance: .aqua, hex: 0xF5F5F6, alpha: 1)
+        assertColor(Color(nsColor: KumoTheme.windowColor(dark: true)),
+                    appearance: .darkAqua, hex: 0x1E1E1E, alpha: 1)
     }
 
     func testThemeUpdatesPreserveWindowChromeAndGeometry() {
@@ -51,6 +55,7 @@ final class KumoAppearanceTests: XCTestCase {
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: true)
         window.isReleasedWhenClosed = false
         defer { window.close() }
+        window.toolbar = NSToolbar(identifier: "KumoAppearanceTests")
         let chrome = StandardWindowChrome.ChromeView()
         let originalTitlebarViews = window.standardWindowButton(.closeButton)?.superview?.subviews ?? []
         window.contentView?.addSubview(chrome)
@@ -62,7 +67,8 @@ final class KumoAppearanceTests: XCTestCase {
             XCTAssertEqual(window.frame, original)
             XCTAssertFalse(window.titlebarAppearsTransparent)
             XCTAssertFalse(window.styleMask.contains(.fullSizeContentView))
-            XCTAssertEqual(window.titlebarSeparatorStyle, .line)
+            XCTAssertEqual(window.titlebarSeparatorStyle, .none)
+            XCTAssertEqual(window.toolbar?.showsBaselineSeparator, false)
             XCTAssertEqual(window.standardWindowButton(.closeButton)?.superview?.subviews, originalTitlebarViews)
             for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
                 XCTAssertEqual(window.standardWindowButton(type)?.isHidden, false)
@@ -77,7 +83,7 @@ final class KumoAppearanceTests: XCTestCase {
         let appearances: [(NSAppearance.Name, [String])] = [
             (.aqua, ["rgb(255, 255, 255)", "rgb(29, 29, 31)",
                      "rgb(250, 250, 252)", "rgb(224, 224, 224)"]),
-            (.darkAqua, ["rgb(39, 39, 41)", "rgb(255, 255, 255)",
+            (.darkAqua, ["rgb(42, 42, 44)", "rgb(255, 255, 255)",
                          "rgb(42, 42, 44)", "rgb(51, 51, 51)"]),
             (.aqua, ["rgb(255, 255, 255)", "rgb(29, 29, 31)",
                      "rgb(250, 250, 252)", "rgb(224, 224, 224)"])

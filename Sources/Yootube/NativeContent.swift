@@ -91,6 +91,7 @@ struct NativeVideo: Decodable, Identifiable {
     let authorId: String?
     let viewCount: Int?
     let viewCountText: String?
+    let published: Int?
     let publishedText: String?
     let lengthSeconds: Int?
     var id: String { videoId }
@@ -511,18 +512,19 @@ private struct NativePageScroll<Content: View>: View {
 private struct SearchFilterPicker: View {
     @Binding var selection: SearchResultKind?
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             filterButton(L10n.t("全部"), value: nil)
             ForEach(SearchResultKind.allCases) { kind in filterButton(kind.title, value: kind) }
         }
-        .padding(4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(KumoTheme.recessed, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func filterButton(_ title: String, value: SearchResultKind?) -> some View {
         Button(title) { selection = value }
-            .buttonStyle(KumoButtonStyle(variant: selection == value ? .secondary : .ghost))
-            .frame(minWidth: 64)
+            .buttonStyle(KumoButtonStyle(variant: selection == value ? .secondary : .ghost,
+                                         horizontalPadding: 12))
             .accessibilityAddTraits(selection == value ? .isSelected : [])
     }
 }
@@ -689,8 +691,8 @@ struct NativeVideoCard: View {
         NativeCardSurface {
             VStack(alignment: .leading, spacing: 10) {
                 Button(action: openVideo) {
-                    NativeThumbnail(videoID: videoID, lengthSeconds: lengthSeconds,
-                                    available: thumbnailAvailable)
+                    NativeThumbnail(url: thumbnailAvailable ? VideoAPI.thumbnailURL(videoID) : nil,
+                                    lengthSeconds: lengthSeconds)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
@@ -788,9 +790,7 @@ private struct NativePlaylistCard: View {
         NativeCardSurface {
             Button(action: open) {
                 VStack(alignment: .leading, spacing: 10) {
-                    NativeRemoteImage(url: thumbnailURL, icon: "play")
-                        .aspectRatio(16 / 9, contentMode: .fill).clipped()
-                        .nativeImageBorder(RoundedRectangle(cornerRadius: KumoTheme.radiusSmall))
+                    NativeThumbnail(url: thumbnailURL, lengthSeconds: nil)
                         .overlay(alignment: .bottomTrailing) {
                             if let videoCount {
                                 Text(L10n.t("\(videoCount) 个视频")).font(.system(size: 10, weight: .medium))
@@ -826,14 +826,13 @@ private struct NativeCardSurface<Content: View>: View {
 }
 
 private struct NativeThumbnail: View {
-    let videoID: String
+    let url: URL?
     let lengthSeconds: Int?
-    var available = true
     var body: some View {
         GeometryReader { geometry in
             Color.clear
                 .overlay {
-                NativeRemoteImage(url: available ? VideoAPI.thumbnailURL(videoID) : nil, icon: "play")
+                NativeRemoteImage(url: url, icon: "play")
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
                 }

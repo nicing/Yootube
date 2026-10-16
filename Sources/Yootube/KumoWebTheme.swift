@@ -11,7 +11,7 @@ enum KumoWebTheme {
       style.textContent = `
         :root { color-scheme:light; --yt-canvas:#ffffff; --yt-base:#fafafc; --yt-recessed:#f5f5f7; --yt-tint:rgba(210,210,215,.64); --yt-text:#1d1d1f; --yt-subtle:#7a7a7a; --yt-line:#e0e0e0; --yt-link:#b42318; }
         @media(prefers-color-scheme:dark) {
-          :root { color-scheme:dark; --yt-canvas:#272729; --yt-base:#2a2a2c; --yt-recessed:#252527; --yt-tint:#333333; --yt-text:#ffffff; --yt-subtle:#cccccc; --yt-line:#333333; --yt-link:#ff6b6b; }
+          :root { color-scheme:dark; --yt-canvas:#2a2a2c; --yt-base:#2a2a2c; --yt-recessed:#272729; --yt-tint:#333333; --yt-text:#ffffff; --yt-subtle:#cccccc; --yt-line:#333333; --yt-link:#ff6b6b; }
         }
         html,body,#contents { background:var(--yt-canvas)!important; color:var(--yt-text)!important; font-family:-apple-system,BlinkMacSystemFont,sans-serif!important; }
         body { font-size:14px; line-height:1.5; }

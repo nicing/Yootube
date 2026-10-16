@@ -1,9 +1,27 @@
+import AppKit
 import WebKit
 import XCTest
 @testable import Yootube
 
 @MainActor
 final class PlayerSkinTests: XCTestCase {
+    func testFKeyMatchesNativePlayerFullScreenExitShortcut() throws {
+        let f = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: 0, context: nil, characters: "f",
+            charactersIgnoringModifiers: "f", isARepeat: false, keyCode: 3
+        ))
+        let commandF = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+            windowNumber: 0, context: nil, characters: "f",
+            charactersIgnoringModifiers: "f", isARepeat: false, keyCode: 3
+        ))
+
+        XCTAssertTrue(PlayerFullScreenKeyboardShortcut.matches(f, playerIsFullScreen: true))
+        XCTAssertFalse(PlayerFullScreenKeyboardShortcut.matches(f, playerIsFullScreen: false))
+        XCTAssertFalse(PlayerFullScreenKeyboardShortcut.matches(commandF, playerIsFullScreen: true))
+    }
+
     private func fixture(storedQuality: Int? = nil, blocksMenuClicks: Bool = false,
                          playbackHandler: (any WKScriptMessageHandler)? = nil) async throws -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -83,6 +101,27 @@ final class PlayerSkinTests: XCTestCase {
         XCTAssertEqual(result as? Bool, true)
     }
 
+    func testPlayerControlsFollowTraditionalChineseAndJapaneseSelection() async throws {
+        let web = try await nativeFixture()
+        let result = try await web.evaluateJavaScript("""
+        (() => {
+          window.yootubeSetLanguage('zh-Hant');
+          const traditional = document.querySelector('[data-action=menu]').getAttribute('aria-label') === '播放設定' &&
+            document.querySelector('[data-action=captions]').getAttribute('aria-label') === '開啟字幕';
+          window.yootubeSetLanguage('ja');
+          const japanese = document.querySelector('[data-action=menu]').getAttribute('aria-label') === '再生設定' &&
+            document.querySelector('[data-action=captions]').getAttribute('aria-label') === '字幕をオン';
+          document.querySelector('[data-action=menu]').click();
+          const quality = [...document.querySelectorAll('.video-player__menu-button')]
+            .find(button => button.textContent === '画質 ›');
+          quality?.click();
+          const cached = document.querySelector('.video-player__menu-button.is-active')?.textContent;
+          return traditional && japanese && cached === '1080p（ローカルキャッシュ）';
+        })()
+        """)
+        XCTAssertEqual(result as? Bool, true)
+    }
+
     func testPlaybackAndKeyboardDoNotDoubleDispatch() async throws {
         let web = try await fixture()
         let result = try await web.evaluateJavaScript("""
@@ -95,7 +134,7 @@ final class PlayerSkinTests: XCTestCase {
           button.dispatchEvent(new KeyboardEvent('keydown', {key:' ', bubbles:true, cancelable:true}));
           const noUpstream = mock.upstreamKeys === 0;
           button.click();
-          document.querySelector('[data-action=mute]').click();
+          window.yootubeToggleMute();
           return played && paused && noUpstream && mock.plays === 2 && mock.muted &&
             document.querySelector('[data-icon=pause]').hidden === false;
         })()
@@ -221,12 +260,17 @@ final class PlayerSkinTests: XCTestCase {
             AppKeyboardShortcut.action(for: event, firstResponder: responder, hasVideoDetail: video)
         }
 
-        XCTAssertEqual(action(try event()), .toggleSidebar)
+        XCTAssertEqual(action(try event()), .keyboardShortcuts)
+        XCTAssertEqual(action(try event("[", keyCode: 33)), .toggleSidebar)
         XCTAssertEqual(action(try event("h")), .home)
+        XCTAssertEqual(action(try event("r")), .refresh)
+        XCTAssertEqual(action(try event("u")), .channelUpdates)
+        XCTAssertEqual(action(try event("u"), video: true), .channelUpdates)
         XCTAssertEqual(action(try event("", keyCode: 123)), .back)
         XCTAssertEqual(action(try event("", keyCode: 124)), .forward)
         XCTAssertEqual(action(try event("k", modifiers: .command)), .focusSearch)
         XCTAssertEqual(action(try event("f", modifiers: .command)), .focusSearch)
+        XCTAssertEqual(action(try event("b", modifiers: .command)), .toggleSidebar)
         XCTAssertEqual(action(try event("n", modifiers: .command)), .newFavoriteFolder)
         XCTAssertEqual(action(try event(",", modifiers: .command)), .settings)
         XCTAssertEqual(action(try event("?", modifiers: .shift,
@@ -234,6 +278,9 @@ final class PlayerSkinTests: XCTestCase {
         XCTAssertEqual(action(try event("?")), .keyboardShortcuts)
         XCTAssertNil(action(try event("?", modifiers: .shift,
                                       charactersIgnoringModifiers: "/"), responder: NSTextView()))
+        XCTAssertNil(action(try event("/"), responder: NSTextView()))
+        XCTAssertNil(action(try event("[", keyCode: 33), responder: NSTextView()))
+        XCTAssertNil(action(try event("s", modifiers: [.command, .control])))
         XCTAssertEqual(action(try event("1", modifiers: .command)), .home)
         for number in 2...8 {
             XCTAssertEqual(action(try event(String(number), modifiers: .command)),
@@ -248,6 +295,9 @@ final class PlayerSkinTests: XCTestCase {
         XCTAssertEqual(action(try event("c"), video: true), .captions)
         XCTAssertNil(action(try event("b")))
         XCTAssertNil(action(try event("h"), responder: NSTextView()))
+        XCTAssertNil(action(try event("r"), responder: NSTextView()))
+        XCTAssertNil(action(try event("u"), responder: NSTextView()))
+        XCTAssertNil(action(try event("u", modifiers: .command)))
         XCTAssertEqual(action(try event("k", modifiers: .command), responder: NSTextView()), .focusSearch)
         XCTAssertNil(action(try event("h", modifiers: .shift)))
         XCTAssertNil(action(try event(repeat: true)))
@@ -257,13 +307,17 @@ final class PlayerSkinTests: XCTestCase {
         let sections = KeyboardShortcutsSheet.sections
         XCTAssertEqual(sections.map(\.title), ["导航", "收藏夹", "视频播放"])
         XCTAssertTrue(sections[0].items.contains { $0.title == "设置" })
+        XCTAssertTrue(sections[0].items.contains { $0.title == "刷新" && $0.keys == ["R"] })
+        XCTAssertTrue(sections[0].items.contains { $0.title == "打开或关闭频道更新" && $0.keys == ["U"] })
+        XCTAssertTrue(sections[0].items.contains { $0.title == "显示快捷键" && $0.keys == ["/", "?"] })
+        XCTAssertTrue(sections[0].items.contains { $0.title == "打开或关闭左侧栏" && $0.keys == ["⌘ B", "["] })
         XCTAssertEqual(sections[1].items.map(\.title),
                        ["首页", "第 1–7 个收藏夹", "最后一个收藏夹", "新建收藏夹"])
         XCTAssertTrue(sections[2].items.contains {
             $0.title == "影院模式 / 播放器全屏" && $0.keys == ["F"]
         })
         let keys = sections.flatMap(\.items).flatMap(\.keys)
-        for expected in ["?", "/", "⌘ K", "⌘ F", "H", "←", "→", "⌘ 1", "⌘ 2 – ⌘ 8", "⌘ 9",
+        for expected in ["/", "?", "⌘ B", "[", "⌘ K", "⌘ F", "H", "←", "→", "R", "U", "⌘ 1", "⌘ 2 – ⌘ 8", "⌘ 9",
                          "⌘ N", "⌘ ,", "空格", "B", "S", "F", "D", "M", "C"] {
             XCTAssertTrue(keys.contains(expected), "快捷键弹窗缺少 \(expected)")
         }
@@ -271,6 +325,8 @@ final class PlayerSkinTests: XCTestCase {
 
     func testSidebarShortcutHintLabelsMatchNumberShortcuts() {
         XCTAssertEqual(SidebarShortcutHints.homeLabel, "1")
+        XCTAssertEqual(SidebarShortcutHints.newFolderLabel, "N")
+        XCTAssertEqual(SidebarShortcutHints.settingsLabel, ",")
         XCTAssertEqual(SidebarShortcutHints.labels(forFolderAt: 0, folderCount: 1), ["2"])
         XCTAssertEqual(SidebarShortcutHints.labels(forFolderAt: 6, folderCount: 7), ["8"])
         XCTAssertEqual(SidebarShortcutHints.labels(forFolderAt: 6, folderCount: 8), ["8"])
@@ -286,7 +342,7 @@ final class PlayerSkinTests: XCTestCase {
         unrelated.placeholderString = "其他输入框"
         let container = NSView()
         let search = NSTextField()
-        search.placeholderString = ToolbarSearchFieldLocator.placeholder
+        search.identifier = ToolbarSearchFieldLocator.identifier
         root.addSubview(unrelated)
         root.addSubview(container)
         container.addSubview(search)
@@ -295,12 +351,26 @@ final class PlayerSkinTests: XCTestCase {
         XCTAssertNil(ToolbarSearchFieldLocator.find(in: unrelated))
     }
 
+    func testToolbarSearchFieldLocatorUsesStableIdentifier() {
+        let search = NSTextField()
+        search.identifier = ToolbarSearchFieldLocator.identifier
+        search.placeholderString = "Localized placeholder"
+        let unrelated = NSTextField()
+        unrelated.placeholderString = ToolbarSearchFieldLocator.placeholder
+
+        let root = NSView()
+        root.addSubview(unrelated)
+        root.addSubview(search)
+        XCTAssertTrue(ToolbarSearchFieldLocator.find(in: root) === search)
+        XCTAssertNil(ToolbarSearchFieldLocator.find(in: unrelated))
+    }
+
     func testToolbarSearchFieldResignsOnlyForClicksOutsideIt() throws {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 300),
                               styleMask: [.titled], backing: .buffered, defer: false)
         let root = try XCTUnwrap(window.contentView)
         let search = NSTextField(frame: NSRect(x: 100, y: 220, width: 260, height: 36))
-        search.placeholderString = ToolbarSearchFieldLocator.placeholder
+        search.identifier = ToolbarSearchFieldLocator.identifier
         root.addSubview(search)
         search.selectText(nil)
 
@@ -538,17 +608,64 @@ final class PlayerSkinTests: XCTestCase {
           const actions = [...document.querySelectorAll('.video-player__toolbar-button')].map(b => b.dataset.action);
           const cc = document.querySelector('[data-action=captions]');
           cc.click();
-          const captionsOn = textTrackList[0].mode === 'showing' && cc.getAttribute('aria-pressed') === 'true';
+          const popup = document.querySelector('.video-player__captions-popup');
+          const opened = !popup.hidden && cc.getAttribute('aria-expanded') === 'true';
+          [...popup.querySelectorAll('button')].find(b => b.textContent === 'Chinese (Traditional)').click();
+          const captionsOn = textTrackList[1].mode === 'showing' && cc.getAttribute('aria-pressed') === 'true' &&
+            !document.querySelector('[data-icon=cc-on]').hidden;
           cc.click();
-          const captionsOff = textTrackList.every(track => track.mode === 'disabled') && cc.getAttribute('aria-pressed') === 'false';
+          popup.querySelector('button').click();
+          const captionsOff = textTrackList.every(track => track.mode === 'disabled') && cc.getAttribute('aria-pressed') === 'false' &&
+            !document.querySelector('[data-icon=cc-off]').hidden;
           const theater = document.querySelector('[data-action=theater]'); theater.click();
           const theaterOn = !document.querySelector('[data-icon=theater-exit]').hidden && theater.getAttribute('aria-pressed') === 'true';
           const menu = document.querySelector('[data-action=menu]'); menu.click();
           window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',cancelable:true}));
           const onlyMenuClosed = document.querySelector('.video-player__menu').hidden && !document.querySelector('[data-icon=theater-exit]').hidden;
           window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',cancelable:true}));
-          return actions.join(',') === 'mute,captions,theater,menu' && captionsOn && captionsOff &&
+          return actions.join(',') === 'mute,captions,theater,menu' && opened && captionsOn && captionsOff &&
                  theaterOn && onlyMenuClosed && document.querySelector('[data-icon=theater-exit]').hidden;
+        })()
+        """)
+        XCTAssertEqual(result as? Bool, true)
+    }
+
+    func testVolumePopupDragsVerticallyAndCaptionsPopupScrolls() async throws {
+        let web = try await fixture()
+        let result = try await web.evaluateJavaScript("""
+        (() => {
+          const volumeButton = document.querySelector('[data-action=mute]');
+          const anchor = volumeButton.closest('.video-player__toolbar-anchor');
+          const popup = document.querySelector('.video-player__volume-popup');
+          const slider = document.querySelector('.video-player__volume-slider');
+          anchor.dispatchEvent(new MouseEvent('mouseenter'));
+          const opened = !popup.hidden && volumeButton.getAttribute('aria-expanded') === 'true';
+          volumeButton.click();
+          const muted = mock.muted && !popup.hidden && volumeButton.getAttribute('aria-pressed') === 'true';
+          volumeButton.click();
+          const unmuted = !mock.muted && !popup.hidden && volumeButton.getAttribute('aria-pressed') === 'false';
+          anchor.dispatchEvent(new MouseEvent('mouseleave'));
+          const closedOnLeave = popup.hidden;
+          anchor.dispatchEvent(new MouseEvent('mouseenter'));
+          const rect = slider.getBoundingClientRect();
+          const sizeMatches = Math.round(rect.width) === 32 && Math.round(rect.height) === 80;
+          const fillMatches = getComputedStyle(document.querySelector('.video-player__volume-fill')).backgroundColor ===
+            'rgba(255, 255, 255, 0.5)';
+          slider.dispatchEvent(new PointerEvent('pointerdown', {pointerId:4, button:0, clientY:rect.top + 8}));
+          slider.dispatchEvent(new PointerEvent('pointermove', {pointerId:4, clientY:rect.bottom - 8}));
+          slider.dispatchEvent(new PointerEvent('pointerup', {pointerId:4}));
+          const dragged = mock.volume < 0.2 && mock.volume > 0 && slider.getAttribute('aria-valuenow') === '10';
+          const closed = popup.hidden && volumeButton.getAttribute('aria-expanded') === 'false';
+
+          for (let i = 0; i < 15; i++) textTrackList.push({kind:'captions', label:`Language ${i}`, language:`l${i}`, mode:'disabled'});
+          document.querySelector('[data-action=captions]').click();
+          const list = document.querySelector('.video-player__captions-list');
+          list.scrollTop = 60;
+          fire('timeupdate');
+          return opened && muted && unmuted && closedOnLeave && sizeMatches && fillMatches &&
+            dragged && closed && list.scrollHeight > list.clientHeight &&
+            list.scrollTop === 60 &&
+            [...list.querySelectorAll('button')].some(b => b.textContent === 'Language 14');
         })()
         """)
         XCTAssertEqual(result as? Bool, true)
@@ -702,6 +819,31 @@ final class PlayerSkinTests: XCTestCase {
             ["rgb(0, 0, 0)", "rgb(0, 0, 0)", "rgb(0, 0, 0)"],
             ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]
         ])
+    }
+
+    func testEnteringPlayerFullScreenClearsTimelineHoverAndFocus() async throws {
+        let web = try await fixture()
+        let result = try await web.evaluateJavaScript("""
+        (() => {
+          const shell = document.querySelector('#player');
+          const timeline = document.querySelector('.video-player__timeline');
+          const tooltip = document.querySelector('.video-player__timeline-tooltip');
+          const rect = timeline.getBoundingClientRect();
+          timeline.dispatchEvent(new PointerEvent('pointerenter', {
+            clientX: rect.left + rect.width / 2
+          }));
+          timeline.focus();
+          const startedHovered = shell.classList.contains('is-video-hovering') &&
+            !tooltip.hidden && document.activeElement === timeline;
+
+          window.yootubeSetPlayerFullScreen(true);
+
+          return startedHovered &&
+            !shell.classList.contains('is-video-hovering') &&
+            tooltip.hidden && document.activeElement !== timeline;
+        })()
+        """)
+        XCTAssertEqual(result as? Bool, true)
     }
 
     private static let html = #"""

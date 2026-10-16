@@ -4,6 +4,26 @@ import XCTest
 
 @MainActor
 final class VideoCacheTests: XCTestCase {
+    func testCachedVideoCanOpenBeforeTheLocalServiceIsReady() throws {
+        let cachedID = "sZSlTDlo0Ag"
+        let cachedURL = try XCTUnwrap(VideoRoute.watchURL(id: cachedID))
+        let uncachedURL = try XCTUnwrap(VideoRoute.watchURL(id: "4Ui09XbYf1A"))
+        let searchURL = try XCTUnwrap(URL(string: "http://127.0.0.1:38473/search?q=test"))
+
+        XCTAssertTrue(canOpenPageImmediately(
+            cachedURL, serviceReady: false, cachedVideoIDs: [cachedID]
+        ))
+        XCTAssertFalse(canOpenPageImmediately(
+            uncachedURL, serviceReady: false, cachedVideoIDs: [cachedID]
+        ))
+        XCTAssertFalse(canOpenPageImmediately(
+            searchURL, serviceReady: false, cachedVideoIDs: [cachedID]
+        ))
+        XCTAssertTrue(canOpenPageImmediately(
+            searchURL, serviceReady: true, cachedVideoIDs: []
+        ))
+    }
+
     func testRangedDownloadResumesWhenAProxyResponseEndsEarly() async throws {
         let payload = Data((0..<10).map(UInt8.init))
         VideoCacheURLProtocol.prepare(payload: payload, truncatesFirstResponse: true)
