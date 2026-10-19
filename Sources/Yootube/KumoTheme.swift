@@ -30,7 +30,7 @@ enum KumoTheme {
             return color(isDark ? dark : light, alpha: isDark ? darkAlpha : lightAlpha)
         })
     }
-    static let sidebar = adaptive("KumoSidebar", light: 0xF5F6F7, dark: 0x1E1E1E)
+    static let sidebar = adaptive("KumoSidebar", light: 0xF5F5F5, dark: 0x1E1E1E)
     static let canvas = adaptive("KumoCanvas", light: 0xFFFFFF, dark: 0x2A2A2C)
     static let base = adaptive("KumoBase", light: 0xFAFAFC, dark: 0x2A2A2C)
     static let recessed = adaptive("KumoRecessed", light: 0xF5F5F7, dark: 0x272729)
@@ -51,7 +51,7 @@ enum KumoTheme {
     static let radiusSmall: CGFloat = 8
     static let radius: CGFloat = 10
     static let radiusPanel: CGFloat = 14
-    static func windowColor(dark: Bool) -> NSColor { color(dark ? 0x1E1E1E : 0xF5F5F6) }
+    static func windowColor(dark: Bool) -> NSColor { color(dark ? 0x1E1E1E : 0xF5F5F5) }
 }
 
 struct KumoButtonStyle: ButtonStyle {

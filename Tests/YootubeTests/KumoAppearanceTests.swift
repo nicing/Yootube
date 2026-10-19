@@ -8,7 +8,7 @@ import XCTest
 final class KumoAppearanceTests: XCTestCase {
     func testNativeThemeUsesAppleNeutralPaletteInBothAppearances() {
         let light: [(Color, UInt32, CGFloat)] = [
-            (KumoTheme.sidebar, 0xF5F6F7, 1),
+            (KumoTheme.sidebar, 0xF5F5F5, 1),
             (KumoTheme.canvas, 0xFFFFFF, 1),
             (KumoTheme.base, 0xFAFAFC, 1),
             (KumoTheme.recessed, 0xF5F5F7, 1),
@@ -44,7 +44,7 @@ final class KumoAppearanceTests: XCTestCase {
         assertColor(KumoTheme.bodyOnDark, appearance: .aqua, hex: 0xFFFFFF, alpha: 1)
         assertColor(KumoTheme.surfaceBlack, appearance: .aqua, hex: 0x000000, alpha: 1)
         assertColor(Color(nsColor: KumoTheme.windowColor(dark: false)),
-                    appearance: .aqua, hex: 0xF5F5F6, alpha: 1)
+                    appearance: .aqua, hex: 0xF5F5F5, alpha: 1)
         assertColor(Color(nsColor: KumoTheme.windowColor(dark: true)),
                     appearance: .darkAqua, hex: 0x1E1E1E, alpha: 1)
     }

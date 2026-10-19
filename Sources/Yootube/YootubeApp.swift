@@ -127,7 +127,8 @@ struct StandardWindowChrome: NSViewRepresentable {
         if let effect = view as? NSVisualEffectView,
            effect.material == .contentBackground {
             effect.material = .sidebar
-            effect.alphaValue = dark ? 0 : 0.50
+            // Preserve the native titlebar while matching its light material to the sidebar.
+            effect.alphaValue = dark ? 0 : 0.36
         }
         view.subviews.forEach {
             updateTitlebarEffects(in: $0, titlebarWidth: titlebarWidth, dark: dark)
